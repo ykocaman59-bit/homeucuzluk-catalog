@@ -3,12 +3,11 @@ let products = JSON.parse(localStorage.getItem('homeucuzluk_products')) || [];
 document.addEventListener('DOMContentLoaded', () => {
     renderProducts();
     
-    // Görsel yüklendiğinde Tesseract.js (OCR) ile metin okuma
+    // Görsel yüklendiğinde OCR (Akıllı Metin Okuma)
     document.getElementById('image-input').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Önizleme
         const reader = new FileReader();
         reader.onload = (event) => {
             document.getElementById('image-preview').src = event.target.result;
@@ -16,9 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         reader.readAsDataURL(file);
 
-        // OCR Tarama Başlat
         const status = document.getElementById('ocr-status');
-        status.innerText = "⏳ Görsel taranıyor ve metinler okunuyor...";
+        status.innerText = "⏳ Görsel taranıyor, bilgiler çıkarılıyor...";
         
         try {
             const worker = await Tesseract.createWorker('tur');
@@ -26,29 +24,28 @@ document.addEventListener('DOMContentLoaded', () => {
             await worker.terminate();
 
             const text = ret.data.text;
-            status.innerText = "✅ Metin taranıp form alanlarına yüklendi!";
+            status.innerText = "✅ Bilgiler başarıyla tarandı ve dolduruldu!";
 
-            // Fiyat tespiti (Örn: 150 TL veya 150,00 mantığı)
+            // Fiyat tespiti
             const priceMatch = text.match(/(\d+[\.,]?\d*)\s*(TL|tl|₺)/);
             if (priceMatch) {
                 document.getElementById('price-input').value = priceMatch[1].replace(',', '.');
             }
 
-            // Metnin ilk satırını başlık olarak al
+            // Başlık tespiti
             const lines = text.split('\n').filter(l => l.trim() !== '');
             if (lines.length > 0) {
                 document.getElementById('title-input').value = lines[0].substring(0, 50);
             }
             
-            // Tam metni açıklamaya yaz
             document.getElementById('desc-input').value = text;
 
         } catch (err) {
-            status.innerText = "⚠️ Metin okunamadı, bilgileri manuel giriniz.";
+            status.innerText = "⚠️ Otomatik okunamadı, alanları manuel doldurabilirsiniz.";
         }
     });
 
-    // Form Gönderimi
+    // Form Gönderimi (Ürün Ekleme)
     document.getElementById('add-product-form').addEventListener('submit', (e) => {
         e.preventDefault();
 
@@ -66,42 +63,55 @@ document.addEventListener('DOMContentLoaded', () => {
         products.push(newProduct);
         localStorage.setItem('homeucuzluk_products', JSON.stringify(products));
         
-        alert("Ürün / İnsert başarıyla eklendi!");
+        alert("Ürün başarıyla eklendi!");
         document.getElementById('add-product-form').reset();
         document.getElementById('image-preview-container').classList.add('hidden');
+        document.getElementById('ocr-status').innerText = "Görsel seçildiğinde metinler taranacaktır...";
         renderProducts();
     });
 });
 
-// Ürün ve İnsertleri Ekrana Basma ve Tarih Kontrolü
+// Ürünleri Listeleme ve Otomatik/Manuel Yönetim
 function renderProducts() {
     const catalogGrid = document.getElementById('insert-grid');
     const productGrid = document.getElementById('product-grid');
+    const adminList = document.getElementById('admin-product-list');
     
     catalogGrid.innerHTML = '';
     productGrid.innerHTML = '';
+    adminList.innerHTML = '';
 
     const today = new Date().toISOString().split('T')[0];
 
     products.forEach(item => {
-        // Tarihi geçmiş ürünleri otomatik gizle
+        // Yönetim paneli listesi (Süresi geçse bile admin görebilsin ve silsin diye burada listelenir)
+        const adminItem = document.createElement('div');
+        adminItem.className = 'admin-item';
+        adminItem.innerHTML = `
+            <span><b>${item.title}</b> (${item.price} ₺) - Bitiş: ${item.expiry}</span>
+            <button class="delete-btn" onclick="deleteProduct(${item.id})">Sil / Kaldır</button>
+        `;
+        adminList.appendChild(adminItem);
+
+        // Tarihi geçmiş ürünleri yayından otomatik gizle
         if (item.expiry < today) return;
 
         const card = document.createElement('div');
         card.className = 'product-card';
         
-        // Sipariş linki (Instagram yönlendirmesi)
-        const instagramUrl = `https://www.instagram.com/homeucuzluk`;
+        // Instagram DM otomatik mesaj bağlantısı
+        const dmMessage = encodeURIComponent(`Merhaba, "${item.title}" (${item.price} ₺) ürününüzü sipariş etmek istiyorum. Kargo durumu: ${item.shipping}`);
+        const instagramDmUrl = `https://ig.me/m/homeucuzluk?text=${dmMessage}`;
 
         card.innerHTML = `
             <img src="${item.image}" alt="${item.title}">
             <div class="product-info">
                 <h3>${item.title}</h3>
                 <div class="price-tag">${item.price} ₺</div>
-                <p>${item.desc}</p>
+                <p style="white-space: pre-line; font-size: 0.9rem;">${item.desc}</p>
                 <span class="badge badge-shipping">${item.shipping}</span>
                 <div class="expiry-tag">⏱️ Son Geçerlilik: ${item.expiry}</div>
-                <a href="${instagramUrl}" target="_blank" class="buy-btn">Instagram'dan Sipariş Et</a>
+                <a href="${instagramDmUrl}" target="_blank" class="dm-btn">💬 Instagram DM ile Sipariş Ver</a>
             </div>
         `;
 
@@ -111,6 +121,15 @@ function renderProducts() {
             productGrid.appendChild(card);
         }
     });
+}
+
+// Ürün Silme / Erken Kaldırma Fonksiyonu
+function deleteProduct(id) {
+    if (confirm("Bu ürünü/inserti yayından kaldırmak istediğinizden emin misiniz?")) {
+        products = products.filter(p => p.id !== id);
+        localStorage.setItem('homeucuzluk_products', JSON.stringify(products));
+        renderProducts();
+    }
 }
 
 function switchTab(tab) {
@@ -125,5 +144,4 @@ function switchTab(tab) {
 
 function toggleAdminPanel() {
     document.getElementById('admin-panel').classList.toggle('hidden');
-          }
-
+}

@@ -1,50 +1,44 @@
 let products = JSON.parse(localStorage.getItem('homeucuzluk_products')) || [];
-
-// 🔒 YÖNETİCİ ŞİFRESİ
-const ADMIN_PASSWORD = "14531453"; 
+const ADMIN_PASSWORD = "14531453";
+let aktifIndeks = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
     renderProducts();
-    
-    // Görsel yüklendiğinde metin okuma (OCR)
+
+    // Görsel Seçildiğinde Otomatik Sıkıştırma + OCR
     document.getElementById('image-input').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            document.getElementById('image-preview').src = event.target.result;
-            document.getElementById('image-preview-container').classList.remove('hidden');
-        };
-        reader.readAsDataURL(file);
-
         const status = document.getElementById('ocr-status');
-        status.innerText = "⏳ Görsel taranıyor, bilgiler çıkarılıyor...";
-        
+        status.innerText = "⏳ Görsel optimize ediliyor ve okunuyor...";
+
+        // Resim Boyutunu Küçültme (Storage Dolmasını Önler)
+        const compressedImage = await compressImage(file, 800, 0.7);
+        document.getElementById('image-preview').src = compressedImage;
+        document.getElementById('image-preview-container').classList.remove('hidden');
+
         try {
             const worker = await Tesseract.createWorker('tur');
             const ret = await worker.recognize(file);
             await worker.terminate();
 
             const text = ret.data.text;
-            status.innerText = "✅ Metin okuma tamamlandı!";
+            status.innerText = "✅ Görsel tarandı!";
 
-            // Otomatik Fiyat Yakalama
             const priceMatch = text.match(/(\d+[\.,]?\d*)\s*(TL|tl|₺)/);
             if (priceMatch) {
                 document.getElementById('price-input').value = priceMatch[1].replace(',', '.');
             }
 
-            // Otomatik Başlık Yakalama
             const lines = text.split('\n').filter(l => l.trim().length > 3);
             if (lines.length > 0) {
                 document.getElementById('title-input').value = lines[0].substring(0, 50);
             }
-            
             document.getElementById('desc-input').value = text;
 
         } catch (err) {
-            status.innerText = "⚠️ Otomatik metin okunamadı, bilgileri manuel doldurabilirsiniz.";
+            status.innerText = "⚠️ Metin okunamadı, bilgileri elle girebilirsiniz.";
         }
     });
 
@@ -65,88 +59,153 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         products.push(newProduct);
-        localStorage.setItem('homeucuzluk_products', JSON.stringify(products));
         
-        alert("Ürün / İnsert başarıyla eklendi!");
+        try {
+            localStorage.setItem('homeucuzluk_products', JSON.stringify(products));
+            alert("Ürün başarıyla eklendi ve kaydedildi!");
+        } catch(err) {
+            alert("Hafıza dolu! Lütfen eski bazı ürünleri yönetim panelinden silin.");
+        }
+
         document.getElementById('add-product-form').reset();
         document.getElementById('image-preview-container').classList.add('hidden');
-        document.getElementById('ocr-status').innerText = "";
         renderProducts();
     });
 });
 
-// Ürünleri ve Kataloğu Ekrana Basma
+// Resim Sıkıştırma Fonksiyonu
+function compressImage(file, maxWidth, quality) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+        };
+    });
+}
+
+// Ürünleri Listeleme ve Ekranı Yenileme
 function renderProducts() {
-    const insertCarousel = document.getElementById('insert-carousel');
+    const slidesContainer = document.getElementById('carouselSlides');
+    const noktalarKutusu = document.getElementById('noktalarKutusu');
     const productGrid = document.getElementById('product-grid');
     const adminList = document.getElementById('admin-product-list');
-    
-    insertCarousel.innerHTML = '';
+
+    slidesContainer.innerHTML = '';
+    noktalarKutusu.innerHTML = '';
     productGrid.innerHTML = '';
     adminList.innerHTML = '';
 
     const today = new Date().toISOString().split('T')[0];
-    let insertCount = 0;
+    let insertItems = [];
 
     products.forEach(item => {
-        // Admin Liste Yönetimi
+        // Admin Liste
         const adminItem = document.createElement('div');
         adminItem.className = 'admin-item';
         adminItem.innerHTML = `
             <span><b>${item.title}</b> (${item.price} ₺) - [Bitiş: ${item.expiry}]</span>
-            <button class="delete-btn" onclick="deleteProduct(${item.id})">Sil</button>
+            <button onclick="deleteProduct(${item.id})" style="background:#e50914; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Sil</button>
         `;
         adminList.appendChild(adminItem);
 
-        // Bitiş tarihi geçen ürünleri müşteri görünümünde otomatik kaldır
-        if (item.expiry < today) return;
+        if (item.expiry < today) return; // Tarihi geçenleri yayından kaldır
 
-        // 1. İNSERT KATALOG MODU
         if (item.type === 'insert') {
-            insertCount++;
-            const pageDiv = document.createElement('div');
-            pageDiv.className = 'carousel-page';
-            pageDiv.innerHTML = `
+            insertItems.push(item);
+        } else {
+            // Tekil Ürün Kartı
+            const card = document.createElement('div');
+            card.className = 'product-card';
+            card.innerHTML = `
                 <img src="${item.image}" alt="${item.title}">
-                <div class="page-footer">
-                    <span>${item.title} - ${item.price} ₺</span> | 
-                    <small>Geçerlilik: ${item.startDate} / ${item.expiry}</small>
+                <div class="product-card-body">
+                    <h3>${item.title}</h3>
+                    <div class="price-tag">${item.price} ₺</div>
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:8px;">${item.desc}</p>
+                    <button onclick="orderViaInstagram('${item.title}', '${item.price}', '${item.shipping}')" class="dm-btn">
+                        💬 Instagram DM ile Sipariş Et
+                    </button>
                 </div>
             `;
-            insertCarousel.appendChild(pageDiv);
+            productGrid.appendChild(card);
         }
-
-        // 2. TEKİL ÜRÜN KARTLARI MODU
-        const card = document.createElement('div');
-        card.className = 'product-card';
-        card.innerHTML = `
-            <img src="${item.image}" alt="${item.title}">
-            <div class="product-info">
-                <h3>${item.title}</h3>
-                <div class="price-tag">${item.price} ₺</div>
-                <p style="white-space: pre-line; font-size: 0.85rem; color: #555;">${item.desc}</p>
-                <span class="badge badge-shipping">${item.shipping}</span>
-                <div style="font-size: 0.75rem; color: #888; margin-bottom: 0.8rem;">⏱️ Son Tarih: ${item.expiry}</div>
-                <button onclick="orderViaInstagram('${item.title}', '${item.price}', '${item.shipping}')" class="order-btn">
-                    💬 Instagram DM ile Sipariş Ver
-                </button>
-            </div>
-        `;
-        productGrid.appendChild(card);
     });
 
-    if (insertCount === 0) {
-        insertCarousel.innerHTML = `<div style="text-align:center; width:100%; padding:2rem; color:#777;">Henüz aktif bir aktüel broşür/insert yüklenmedi.</div>`;
+    // Katalog Slaytlarını Doldur
+    if (insertItems.length > 0) {
+        document.getElementById('baslangic-tarihi').innerText = insertItems[0].startDate;
+        document.getElementById('bitis-tarihi').innerText = insertItems[0].expiry;
+
+        insertItems.forEach((item, idx) => {
+            const slide = document.createElement('div');
+            slide.className = 'slide';
+            slide.innerHTML = `<img src="${item.image}" alt="${item.title}">`;
+            slidesContainer.appendChild(slide);
+
+            const nokta = document.createElement('div');
+            nokta.className = `nokta ${idx === 0 ? 'aktif' : ''}`;
+            nokta.onclick = () => suankiSayfa(idx);
+            noktalarKutusu.appendChild(nokta);
+        });
+    } else {
+        slidesContainer.innerHTML = `
+            <div class="slide">
+                <div class="bos-alan-yazisi">
+                    <i class="fa-regular fa-images" style="font-size: 36px; display:block; margin-bottom:8px;"></i>
+                    Aktif Katalog Bulunmuyor
+                </div>
+            </div>
+        `;
     }
 }
 
-// 📩 Sipariş Detaylarını Kopyalayıp Instagram DM Açma
+// Katalog Slayt Değiştirme
+function sayfaDegistir(yon) {
+    const slides = document.querySelectorAll('.slide');
+    if (slides.length <= 1) return;
+
+    aktifIndeks += yon;
+    if (aktifIndeks >= slides.length) aktifIndeks = 0;
+    if (aktifIndeks < 0) aktifIndeks = slides.length - 1;
+
+    suankiSayfa(aktifIndeks);
+}
+
+function suankiSayfa(indeks) {
+    aktifIndeks = indeks;
+    const slidesContainer = document.getElementById('carouselSlides');
+    slidesContainer.style.transform = `translateX(-${aktifIndeks * 100}%)`;
+
+    const noktalar = document.querySelectorAll('.nokta');
+    noktalar.forEach((n, i) => {
+        n.classList.toggle('aktif', i === aktifIndeks);
+    });
+}
+
+// Instagram DM Sipariş
 function orderViaInstagram(title, price, shipping) {
     const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}`;
     
-    // Panoya sipariş mesajını otomatik kopyala
     navigator.clipboard.writeText(text).then(() => {
-        alert("✅ Sipariş detayları panoya kopyalandı!\n\nŞimdi açılan Instagram sayfasından mesaj alanına 'Yapıştır' (Paste) diyerek direkt gönderebilirsiniz.");
+        alert("✅ Sipariş bilgisi panoya kopyalandı!\n\nAçılan Instagram sayfasında mesaj alanına 'Yapıştır' diyerek gönderebilirsiniz.");
         window.open('https://www.instagram.com/direct/inbox/', '_blank');
     }).catch(() => {
         window.open('https://www.instagram.com/homeucuzluk/', '_blank');
@@ -154,7 +213,7 @@ function orderViaInstagram(title, price, shipping) {
 }
 
 function deleteProduct(id) {
-    if (confirm("Bu ürünü/inserti silmek istediğinize emin misiniz?")) {
+    if (confirm("Bu ürünü silmek istediğinize emin misiniz?")) {
         products = products.filter(p => p.id !== id);
         localStorage.setItem('homeucuzluk_products', JSON.stringify(products));
         renderProducts();

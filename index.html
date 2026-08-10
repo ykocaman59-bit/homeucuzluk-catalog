@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HomeUcuzluk - İnsert ve Ürün Kataloğu</title>
+    <title>HomeUcuzluk - Aktüel Katalog & Ürünler</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Tesseract.js (Görsel Metin Okuma Kütüphanesi) -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 </head>
 <body>
@@ -16,8 +15,8 @@
             <span>Fırsat Ürünleri & Aktüel Katalog</span>
         </div>
         <nav>
-            <button onclick="switchTab('catalog')">🛒 Aktüel İnsertler</button>
-            <button onclick="switchTab('products')">📦 Tekil Ürünler</button>
+            <button onclick="switchTab('catalog')">📖 Aktüel İnsert Kataloğu</button>
+            <button onclick="switchTab('products')">🛍️ Tekil Ürünler</button>
             <button onclick="toggleAdminPanel()" class="admin-btn">⚙️ Yönetim Paneli</button>
         </nav>
     </header>
@@ -26,17 +25,17 @@
         
         <!-- YÖNETİM PANELİ -->
         <section id="admin-panel" class="card hidden">
-            <h2>➕ Ürün veya Çoklu İnsert Ekle</h2>
+            <h2>➕ Yeni İnsert / Ürün Ekle</h2>
             <form id="add-product-form">
                 
                 <div class="form-group">
-                    <label>Görsel Yükle (Otomatik Tarama):</label>
+                    <label>Görsel Yükle (Otomatik Metin Okuma):</label>
                     <input type="file" id="image-input" accept="image/*" required>
-                    <small id="ocr-status">Görsel seçildiğinde metinler taranacaktır...</small>
+                    <small id="ocr-status" style="color: #666; font-weight: bold; margin-top: 5px;"></small>
                 </div>
 
-                <div id="image-preview-container" class="hidden">
-                    <img id="image-preview" src="" alt="Önizleme">
+                <div id="image-preview-container" class="hidden" style="margin-bottom: 1rem;">
+                    <img id="image-preview" src="" alt="Önizleme" style="max-height: 200px; border-radius: 6px;">
                 </div>
 
                 <div class="form-row">
@@ -52,8 +51,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Ürün Açıklaması / Çoklu Ürün Listesi:</label>
-                    <textarea id="desc-input" rows="3" placeholder="Ürün detaylarını veya çoklu ürün listesini girin..."></textarea>
+                    <label>Ürün Açıklaması / Detaylar:</label>
+                    <textarea id="desc-input" rows="3" placeholder="Ürün özelliklerini girin..."></textarea>
                 </div>
 
                 <div class="form-row">
@@ -61,44 +60,59 @@
                         <label>Kargo Durumu:</label>
                         <select id="shipping-input">
                             <option value="Kargo Alıcıya Ait">Kargo Alıcıya Ait</option>
-                            <option value="Ücretsiz Kargo (Satıcıya Ait)">Ücretsiz Kargo (Satıcıya Ait)</option>
+                            <option value="Ücretsiz Kargo">Ücretsiz Kargo (Satıcıya Ait)</option>
                         </select>
                     </div>
 
                     <div class="form-group">
-                        <label>Yayın Tipi (Görünüm):</label>
+                        <label>Yayın Tipi:</label>
                         <select id="type-input">
-                            <option value="single">Tekil Ürün Paylaşımı</option>
-                            <option value="insert">Market İnsertü / Çoklu Katalog</option>
+                            <option value="insert">Market İnsert Kataloğu Görseli</option>
+                            <option value="single">Tekil Ürün Kartı</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Yayın Bitiş Tarihi (Otomatik Kaldırılır):</label>
+                        <label>Katalog / Ürün Başlangıç Tarihi:</label>
+                        <input type="date" id="start-date-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Son Geçerlilik (Silinme) Tarihi:</label>
                         <input type="date" id="expiry-input" required>
                     </div>
                 </div>
 
-                <button type="submit" class="primary-btn">Sisteme Ekle ve Yayınla</button>
+                <button type="submit" class="primary-btn">Sisteme Kaydet ve Yayınla</button>
             </form>
 
             <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #ddd;">
             
-            <h3>📋 Eklenen Ürünleri Yönet / Erken Sil</h3>
-            <div id="admin-product-list" class="admin-list"></div>
+            <h3>📋 Aktif Ürün/İnsert Yönetimi (Erken Silme)</h3>
+            <div id="admin-product-list"></div>
         </section>
 
-        <!-- İNSERT / KATALOG VİTRİNİ -->
+        <!-- AKTÜEL İNSERT KATALOĞU (Grosper Tarzı Broşür) -->
         <section id="catalog-section">
-            <h2>🔥 Aktüel İnsertler ve Çoklu Kataloglar</h2>
-            <div id="insert-grid" class="grid"></div>
+            <div class="catalog-banner">
+                <div class="brand-header">
+                    <h2>HOMEUCUZLUK</h2>
+                    <p class="tagline">HomeUcuzluk ile Alışverişte Fırsatlar!</p>
+                </div>
+                <div class="catalog-badge">AKTÜEL İNDİRİM KATALOĞU</div>
+                <div id="catalog-date-range" class="catalog-date">Güncel Fırsat Katalogları</div>
+            </div>
+
+            <!-- Kaydırmalı Broşür Alanı -->
+            <div id="insert-carousel" class="carousel-container">
+                <!-- Dinamik broşür sayfaları yüklenecek -->
+            </div>
         </section>
 
         <!-- TEKİL ÜRÜNLER VİTRİNİ -->
         <section id="products-section" class="hidden">
-            <h2>🛍️ Tekil Ürün Paylaşımları</h2>
+            <h2>🛍️ Tekil Ürünler & Sipariş Oluşturma</h2>
             <div id="product-grid" class="grid"></div>
         </section>
 

@@ -1,5 +1,18 @@
+// Firebase Ayarları ve Canlı Bağlantı
+const firebaseConfig = {
+  apiKey: "AIzaSyDcQLq-7KlC8qqf3jn3raCS9TIU0aDhoj8",
+  authDomain: "homeucuzluk-dd9c8.firebaseapp.com",
+  projectId: "homeucuzluk-dd9c8",
+  storageBucket: "homeucuzluk-dd9c8.firebasestorage.app",
+  messagingSenderId: "113132988890",
+  appId: "1:113132988890:web:1952c045fb4173f0d3b8e3"
+};
+
+// Firebase Başlatma
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
 const ADMIN_PASSWORD = "14531453";
-let db;
 let selectedCatalogGroup = null;
 let aktifIndeks = 0;
 
@@ -13,26 +26,7 @@ function formatDate(dateStr) {
     return dateStr;
 }
 
-// IndexedDB Kurulumu
-function initDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open("HomeUcuzlukDB", 1);
-        request.onupgradeneeded = (e) => {
-            db = e.target.result;
-            if (!db.objectStoreNames.contains("products")) {
-                db.createObjectStore("products", { keyPath: "id" });
-            }
-        };
-        request.onsuccess = (e) => {
-            db = e.target.result;
-            resolve(db);
-        };
-        request.onerror = (e) => reject(e);
-    });
-}
-
 document.addEventListener('DOMContentLoaded', async () => {
-    await initDB();
     checkAuthStatus();
     renderProducts();
 
@@ -74,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Form Gönderimi
+    // Form Gönderimi (Firebase'e Kayıt)
     document.getElementById('add-product-form').addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -88,7 +82,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const newProduct = {
-            id: Date.now(),
+            createdAt: Date.now(),
             title: document.getElementById('title-input').value,
             price: document.getElementById('price-input').value,
             desc: document.getElementById('desc-input').value,
@@ -100,43 +94,48 @@ document.addEventListener('DOMContentLoaded', async () => {
             image: document.getElementById('image-preview').src
         };
 
-        await saveProductToDB(newProduct);
-        alert("✅ Ürün başarıyla eklendi!");
+        try {
+            await saveProductToDB(newProduct);
+            alert("✅ Ürün başarıyla canlı veritabanına eklendi!");
 
-        document.getElementById('add-product-form').reset();
-        document.getElementById('image-preview-container').classList.add('hidden');
-        document.getElementById('ocr-status').innerText = "Görsel seçildiğinde bilgiler otomatik taranacaktır...";
-        
-        renderProducts();
+            document.getElementById('add-product-form').reset();
+            document.getElementById('image-preview-container').classList.add('hidden');
+            document.getElementById('ocr-status').innerText = "Görsel seçildiğinde bilgiler otomatik taranacaktır...";
+            
+            renderProducts();
+        } catch (error) {
+            alert("❌ Ürün eklenirken bir hata oluştu: " + error.message);
+        }
     });
 });
 
-function saveProductToDB(product) {
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction("products", "readwrite");
-        const store = tx.objectStore("products");
-        store.put(product);
-        tx.oncomplete = () => resolve();
-        tx.onerror = (e) => reject(e);
-    });
+// Firebase Veritabanına Ürün Ekleme
+async function saveProductToDB(product) {
+    await db.collection("products").add(product);
 }
 
-function getAllProductsFromDB() {
-    return new Promise((resolve) => {
-        const tx = db.transaction("products", "readonly");
-        const store = tx.objectStore("products");
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result || []);
-    });
+// Firebase Veritabanından Tüm Ürünleri Çekme
+async function getAllProductsFromDB() {
+    try {
+        const snapshot = await db.collection("products").orderBy("createdAt", "desc").get();
+        let products = [];
+        snapshot.forEach(doc => {
+            products.push({ id: doc.id, ...doc.data() });
+        });
+        return products;
+    } catch (error) {
+        console.error("Veri çekme hatası:", error);
+        return [];
+    }
 }
 
-function deleteProductFromDB(id) {
-    return new Promise((resolve) => {
-        const tx = db.transaction("products", "readwrite");
-        const store = tx.objectStore("products");
-        store.delete(id);
-        tx.oncomplete = () => resolve();
-    });
+// Firebase Veritabanından Ürün Silme
+async function deleteProductFromDB(id) {
+    try {
+        await db.collection("products").doc(id).delete();
+    } catch (error) {
+        console.error("Silme hatası:", error);
+    }
 }
 
 function compressImage(file, maxWidth, quality) {
@@ -190,7 +189,7 @@ async function renderProducts() {
         adminItem.className = 'admin-item';
         adminItem.innerHTML = `
             <span><b>${item.title}</b> (${item.price} ₺) [${item.type === 'insert' ? 'İnsert: ' + formatDate(item.startDate) + ' / ' + formatDate(item.expiry) : 'Tekil Ürün'}]</span>
-            <button onclick="removeProduct(${item.id})" style="background:#e50914; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Sil</button>
+            <button onclick="removeProduct('${item.id}')" style="background:#e50914; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Sil</button>
         `;
         adminList.appendChild(adminItem);
 
@@ -263,7 +262,6 @@ async function renderProducts() {
     }
 }
 
-// Ürün Kartında orderViaInstagram Çağrılırken 4. Parametre (id) Eklendi
 function createProductCard(item) {
     const card = document.createElement('div');
     card.className = 'product-card';
@@ -358,7 +356,6 @@ function suankiSayfa(indeks) {
     });
 }
 
-// Yönlendirme Yapısı Dokunulmadan Sadece Mesaj İçeriğine Ürün Linki Eklendi
 function orderViaInstagram(title, price, shipping, productId) {
     const currentUrl = window.location.href.split('?')[0];
     const productUrl = `${currentUrl}?product=${productId || encodeURIComponent(title)}`;

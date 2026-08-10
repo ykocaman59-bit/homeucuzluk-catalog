@@ -3,7 +3,7 @@ let db = null;
 let selectedCatalogGroup = null;
 let aktifIndeks = 0;
 
-// Tarihi GG.AA.YYYY formatına çevirir (Ters yazılmayı engeller)
+// Tarihi GG.AA.YYYY formatına çevirir (Örn: 10.08.2026)
 function formatDate(dateString) {
     if (!dateString) return '';
     const parts = dateString.split('-');
@@ -42,11 +42,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!file) return;
 
             const status = document.getElementById('ocr-status');
-            status.innerText = "⏳ Görsel taranıyor...";
+            if (status) status.innerText = "⏳ Görsel taranıyor...";
 
             const compressedImage = await compressImage(file, 900, 0.75);
-            document.getElementById('image-preview').src = compressedImage;
-            document.getElementById('image-preview-container').classList.remove('hidden');
+            const preview = document.getElementById('image-preview');
+            if (preview) preview.src = compressedImage;
+            
+            const previewContainer = document.getElementById('image-preview-container');
+            if (previewContainer) previewContainer.classList.remove('hidden');
 
             try {
                 if (window.Tesseract) {
@@ -55,23 +58,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                     await worker.terminate();
 
                     const text = ret.data.text.trim();
-                    status.innerText = "✅ Görsel taranıp bilgiler aktarıldı!";
+                    if (status) status.innerText = "✅ Görsel tarandı!";
 
                     const priceMatch = text.match(/(\d+[\.,]?\d*)\s*(TL|tl|₺)/);
-                    if (priceMatch) {
+                    if (priceMatch && document.getElementById('price-input')) {
                         document.getElementById('price-input').value = priceMatch[1].replace(',', '.');
                     }
 
                     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
                     if (lines.length > 0) {
-                        document.getElementById('title-input').value = lines[0].substring(0, 60);
-                        document.getElementById('desc-input').value = lines.join(' ');
+                        if (document.getElementById('title-input')) document.getElementById('title-input').value = lines[0].substring(0, 60);
+                        if (document.getElementById('desc-input')) document.getElementById('desc-input').value = lines.join(' ');
                     }
-                } else {
-                    status.innerText = "Görsel yüklendi.";
                 }
             } catch (err) {
-                status.innerText = "Görsel yüklendi.";
+                if (status) status.innerText = "Görsel yüklendi.";
             }
         });
     }
@@ -104,7 +105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
 
             await saveProductToDB(newProduct);
-            alert("✅ Ürün kaydedildi!");
+            alert("✅ Kaydedildi!");
 
             document.getElementById('add-product-form').reset();
             document.getElementById('image-preview-container').classList.add('hidden');
@@ -231,31 +232,31 @@ async function renderProducts() {
 
     const slidesContainer = document.getElementById('carouselSlides');
     const noktalarKutusu = document.getElementById('noktalarKutusu');
-    const productGrid = document.getElementById('product-grid');
     const catalogProductGrid = document.getElementById('catalog-product-grid');
+    const productGrid = document.getElementById('product-grid');
     const adminList = document.getElementById('admin-product-list');
     const tabsContainer = document.getElementById('catalog-tabs');
 
-    if (!slidesContainer) return;
-
-    slidesContainer.innerHTML = '';
-    noktalarKutusu.innerHTML = '';
-    productGrid.innerHTML = '';
+    if (slidesContainer) slidesContainer.innerHTML = '';
+    if (noktalarKutusu) noktalarKutusu.innerHTML = '';
     if (catalogProductGrid) catalogProductGrid.innerHTML = '';
-    adminList.innerHTML = '';
-    tabsContainer.innerHTML = '';
+    if (productGrid) productGrid.innerHTML = '';
+    if (adminList) adminList.innerHTML = '';
+    if (tabsContainer) tabsContainer.innerHTML = '';
 
     const insertGroups = {};
 
     products.forEach(item => {
-        const adminItem = document.createElement('div');
-        adminItem.className = 'admin-item';
-        adminItem.style.cssText = "display:flex; justify-content:space-between; margin-bottom:8px; padding:6px; background:#f9f9f9; border:1px solid #ddd;";
-        adminItem.innerHTML = `
-            <span><b>${item.title}</b> (${item.price} ₺) - [${item.type === 'insert' ? formatDate(item.startDate) + ' / ' + formatDate(item.expiry) : 'Tekil'}]</span>
-            <button onclick="removeProduct(${item.id})" style="background:#e50914; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Sil</button>
-        `;
-        adminList.appendChild(adminItem);
+        if (adminList) {
+            const adminItem = document.createElement('div');
+            adminItem.className = 'admin-item';
+            adminItem.style.cssText = "display:flex; justify-content:space-between; margin-bottom:8px; padding:6px; background:#f9f9f9; border:1px solid #ddd;";
+            adminItem.innerHTML = `
+                <span><b>${item.title}</b> (${item.price} ₺) - [${item.type === 'insert' ? formatDate(item.startDate) + ' / ' + formatDate(item.expiry) : 'Tekil'}]</span>
+                <button onclick="removeProduct(${item.id})" style="background:#e50914; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Sil</button>
+            `;
+            adminList.appendChild(adminItem);
+        }
 
         if (item.type === 'insert') {
             const groupKey = `${item.startDate}_${item.expiry}`;
@@ -267,7 +268,7 @@ async function renderProducts() {
                 };
             }
             insertGroups[groupKey].items.push(item);
-        } else {
+        } else if (productGrid) {
             const card = createProductCard(item);
             productGrid.appendChild(card);
         }
@@ -279,46 +280,62 @@ async function renderProducts() {
             selectedCatalogGroup = groupKeys[0];
         }
 
+        // Üst Katalog Sekme Butonları
         groupKeys.forEach(key => {
             const group = insertGroups[key];
-            const btn = document.createElement('button');
-            btn.className = `catalog-tab-btn ${key === selectedCatalogGroup ? 'active' : ''}`;
-            btn.innerText = `📅 ${formatDate(group.startDate)} - ${formatDate(group.expiry)}`;
-            btn.onclick = () => {
-                selectedCatalogGroup = key;
-                renderProducts();
-            };
-            tabsContainer.appendChild(btn);
+            if (tabsContainer) {
+                const btn = document.createElement('button');
+                btn.className = `catalog-tab-btn ${key === selectedCatalogGroup ? 'active' : ''}`;
+                btn.innerText = `📅 ${formatDate(group.startDate)} - ${formatDate(group.expiry)}`;
+                btn.onclick = () => {
+                    selectedCatalogGroup = key;
+                    renderProducts();
+                };
+                tabsContainer.appendChild(btn);
+            }
         });
 
         const activeGroup = insertGroups[selectedCatalogGroup];
-        document.getElementById('baslangic-tarihi').innerText = formatDate(activeGroup.startDate);
-        document.getElementById('bitis-tarihi').innerText = formatDate(activeGroup.expiry);
+        
+        // Tarih Alanlarını Güncelleme
+        const bTarih = document.getElementById('baslangic-tarihi');
+        const eTarih = document.getElementById('bitis-tarihi');
+        if (bTarih) bTarih.innerText = formatDate(activeGroup.startDate);
+        if (eTarih) eTarih.innerText = formatDate(activeGroup.expiry);
 
+        // 1. ÜST ALAN: Katalog Sayfalarını Kaydırmalı (Slide) Yapma
         activeGroup.items.forEach((item, idx) => {
-            const slide = document.createElement('div');
-            slide.className = 'slide';
-            slide.innerHTML = `<img src="${item.image}" alt="${item.title}">`;
-            slidesContainer.appendChild(slide);
+            if (slidesContainer) {
+                const slide = document.createElement('div');
+                slide.className = 'slide';
+                slide.innerHTML = `<img src="${item.image}" alt="${item.title}">`;
+                slidesContainer.appendChild(slide);
+            }
 
-            const nokta = document.createElement('div');
-            nokta.className = `nokta ${idx === 0 ? 'aktif' : ''}`;
-            nokta.onclick = () => suankiSayfa(idx);
-            noktalarKutusu.appendChild(nokta);
+            if (noktalarKutusu) {
+                const nokta = document.createElement('div');
+                nokta.className = `nokta ${idx === 0 ? 'aktif' : ''}`;
+                nokta.onclick = () => suankiSayfa(idx);
+                noktalarKutusu.appendChild(nokta);
+            }
 
-            // Kataloğun altına DM kartlarını basma
+            // 2. ALT ALAN: Seçili Kataloğun Ürünlerini Sipariş Butonlu Liste Olarak Dizme
             if (catalogProductGrid) {
                 const card = createProductCard(item);
                 catalogProductGrid.appendChild(card);
             }
         });
+        
         aktifIndeks = 0;
         suankiSayfa(0);
     } else {
-        slidesContainer.innerHTML = `<div class="slide"><p style="text-align:center; padding:4px;">Aktif Katalog Bulunmuyor</p></div>`;
+        if (slidesContainer) {
+            slidesContainer.innerHTML = `<div class="slide"><p style="text-align:center; padding:20px; color:#fff;">Aktif Katalog Bulunmuyor</p></div>`;
+        }
     }
 }
 
+// Ürün Kartı Oluşturma (Sipariş Butonlu)
 function createProductCard(item) {
     const card = document.createElement('div');
     card.className = 'product-card';
@@ -343,7 +360,7 @@ function createProductCard(item) {
 function toggleDateFields() {
     const type = document.getElementById('type-input').value;
     const dateFields = document.getElementById('date-fields');
-    dateFields.style.display = (type === 'single') ? 'none' : 'flex';
+    if (dateFields) dateFields.style.display = (type === 'single') ? 'none' : 'flex';
 }
 
 function sayfaDegistir(yon) {
@@ -374,7 +391,7 @@ function orderViaInstagram(title, price, shipping) {
     const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}`;
     
     navigator.clipboard.writeText(text).then(() => {
-        alert("✅ Sipariş bilgisi kopyalandı!\n\nInstagram açıldığında mesaj bölümüne yapıştırabilirsiniz.");
+        alert("✅ Sipariş bilgisi kopyalandı!\n\nInstagram açıldığında mesaj kutusuna yapıştırabilirsiniz.");
         window.open('https://www.instagram.com/direct/inbox/', '_blank');
     }).catch(() => {
         window.open('https://www.instagram.com/homeucuzluk/', '_blank');
@@ -389,11 +406,15 @@ async function removeProduct(id) {
 }
 
 function switchTab(tab) {
-    if (tab === 'catalog') {
-        document.getElementById('catalog-section').classList.remove('hidden');
-        document.getElementById('products-section').classList.add('hidden');
-    } else {
-        document.getElementById('catalog-section').classList.add('hidden');
-        document.getElementById('products-section').classList.remove('hidden');
+    const catSec = document.getElementById('catalog-section');
+    const prodSec = document.getElementById('products-section');
+    if (catSec && prodSec) {
+        if (tab === 'catalog') {
+            catSec.classList.remove('hidden');
+            prodSec.classList.add('hidden');
+        } else {
+            catSec.classList.add('hidden');
+            prodSec.classList.remove('hidden');
+        }
     }
 }

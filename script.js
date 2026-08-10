@@ -3,7 +3,7 @@ let db = null;
 let selectedCatalogGroup = null;
 let aktifIndeks = 0;
 
-// Tarihi GG.AA.YYYY formatına çeviren yardımcı fonksiyon
+// Tarihi GG.AA.YYYY formatına çevirir (Ters yazılmayı engeller)
 function formatDate(dateString) {
     if (!dateString) return '';
     const parts = dateString.split('-');
@@ -13,7 +13,6 @@ function formatDate(dateString) {
     return dateString;
 }
 
-// IndexedDB Kurulumu
 function initDB() {
     return new Promise((resolve) => {
         const request = indexedDB.open("HomeUcuzlukDB", 1);
@@ -27,9 +26,7 @@ function initDB() {
             db = e.target.result;
             resolve(db);
         };
-        request.onerror = () => {
-            resolve(null);
-        };
+        request.onerror = () => resolve(null);
     });
 }
 
@@ -71,10 +68,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         document.getElementById('desc-input').value = lines.join(' ');
                     }
                 } else {
-                    status.innerText = "Görsel yüklendi. Bilgileri doldurabilirsiniz.";
+                    status.innerText = "Görsel yüklendi.";
                 }
             } catch (err) {
-                status.innerText = "Görsel yüklendi. Bilgileri elle tamamlayabilirsiniz.";
+                status.innerText = "Görsel yüklendi.";
             }
         });
     }
@@ -144,11 +141,9 @@ function checkAuthStatus() {
     if (isLoggedIn) {
         adminPanel.classList.remove('hidden');
         authBtn.innerText = "👤 Yönetim Paneli (Açık)";
-        authBtn.style.background = "#28a745";
     } else {
         adminPanel.classList.add('hidden');
         authBtn.innerText = "⚙️ Yönetim Paneli";
-        authBtn.style.background = "#e50914";
     }
 }
 
@@ -231,14 +226,13 @@ function compressImage(file, maxWidth, quality) {
     });
 }
 
-// EKRAN YENİLEME VE ÜRÜNLERİ LİSTELEME
 async function renderProducts() {
     const products = await getAllProductsFromDB();
 
     const slidesContainer = document.getElementById('carouselSlides');
     const noktalarKutusu = document.getElementById('noktalarKutusu');
     const productGrid = document.getElementById('product-grid');
-    const catalogProductGrid = document.getElementById('catalog-product-grid'); // Katalog ürünlerinin sıralanacağı alt alan
+    const catalogProductGrid = document.getElementById('catalog-product-grid');
     const adminList = document.getElementById('admin-product-list');
     const tabsContainer = document.getElementById('catalog-tabs');
 
@@ -254,11 +248,11 @@ async function renderProducts() {
     const insertGroups = {};
 
     products.forEach(item => {
-        // Admin Liste Elemanı
         const adminItem = document.createElement('div');
         adminItem.className = 'admin-item';
+        adminItem.style.cssText = "display:flex; justify-content:space-between; margin-bottom:8px; padding:6px; background:#f9f9f9; border:1px solid #ddd;";
         adminItem.innerHTML = `
-            <span><b>${item.title}</b> (${item.price} ₺) - [${item.type === 'insert' ? formatDate(item.startDate) + ' / ' + formatDate(item.expiry) : 'Tekil Ürün'}]</span>
+            <span><b>${item.title}</b> (${item.price} ₺) - [${item.type === 'insert' ? formatDate(item.startDate) + ' / ' + formatDate(item.expiry) : 'Tekil'}]</span>
             <button onclick="removeProduct(${item.id})" style="background:#e50914; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Sil</button>
         `;
         adminList.appendChild(adminItem);
@@ -274,7 +268,6 @@ async function renderProducts() {
             }
             insertGroups[groupKey].items.push(item);
         } else {
-            // Tekil Ürün Kartı
             const card = createProductCard(item);
             productGrid.appendChild(card);
         }
@@ -290,7 +283,6 @@ async function renderProducts() {
             const group = insertGroups[key];
             const btn = document.createElement('button');
             btn.className = `catalog-tab-btn ${key === selectedCatalogGroup ? 'active' : ''}`;
-            // Tarihleri Türkiye formatına çevirerek gösteriyoruz
             btn.innerText = `📅 ${formatDate(group.startDate)} - ${formatDate(group.expiry)}`;
             btn.onclick = () => {
                 selectedCatalogGroup = key;
@@ -304,7 +296,6 @@ async function renderProducts() {
         document.getElementById('bitis-tarihi').innerText = formatDate(activeGroup.expiry);
 
         activeGroup.items.forEach((item, idx) => {
-            // Slayt/Broşör Sayfası
             const slide = document.createElement('div');
             slide.className = 'slide';
             slide.innerHTML = `<img src="${item.image}" alt="${item.title}">`;
@@ -315,7 +306,7 @@ async function renderProducts() {
             nokta.onclick = () => suankiSayfa(idx);
             noktalarKutusu.appendChild(nokta);
 
-            // Katalog Altındaki Ürünlerin Liste Halinde Dizilmesi
+            // Kataloğun altına DM kartlarını basma
             if (catalogProductGrid) {
                 const card = createProductCard(item);
                 catalogProductGrid.appendChild(card);
@@ -324,18 +315,10 @@ async function renderProducts() {
         aktifIndeks = 0;
         suankiSayfa(0);
     } else {
-        slidesContainer.innerHTML = `
-            <div class="slide">
-                <div class="bos-alan-yazisi">
-                    <i class="fa-regular fa-images" style="font-size: 36px; display:block; margin-bottom:8px;"></i>
-                    Aktif Katalog Bulunmuyor
-                </div>
-            </div>
-        `;
+        slidesContainer.innerHTML = `<div class="slide"><p style="text-align:center; padding:4px;">Aktif Katalog Bulunmuyor</p></div>`;
     }
 }
 
-// Ortak Ürün Kartı Oluşturucu Fonksiyon
 function createProductCard(item) {
     const card = document.createElement('div');
     card.className = 'product-card';

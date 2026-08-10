@@ -263,9 +263,12 @@ async function renderProducts() {
     }
 }
 
+// Ürün Kartında orderViaInstagram Çağrılırken 4. Parametre (id) Eklendi
 function createProductCard(item) {
     const card = document.createElement('div');
     card.className = 'product-card';
+    const safeTitle = (item.title || '').replace(/'/g, "\\'");
+    
     card.innerHTML = `
         <img src="${item.image}" alt="${item.title}">
         <div class="product-card-body">
@@ -276,7 +279,7 @@ function createProductCard(item) {
                 <span class="badge badge-shipping">${item.shipping}</span>
             </div>
             <p style="font-size:0.85rem; color:#666; margin-bottom:8px;">${item.desc || ''}</p>
-            <button onclick="orderViaInstagram('${item.title}', '${item.price}', '${item.shipping}')" class="dm-btn">
+            <button onclick="orderViaInstagram('${safeTitle}', '${item.price}', '${item.shipping}', '${item.id}')" class="dm-btn">
                 💬 Instagram DM ile Sipariş Et
             </button>
         </div>
@@ -355,18 +358,20 @@ function suankiSayfa(indeks) {
     });
 }
 
-function orderViaInstagram(title, price, shipping) {
-    const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}`;
+// Yönlendirme Yapısı Dokunulmadan Sadece Mesaj İçeriğine Ürün Linki Eklendi
+function orderViaInstagram(title, price, shipping, productId) {
+    const currentUrl = window.location.href.split('?')[0];
+    const productUrl = `${currentUrl}?product=${productId || encodeURIComponent(title)}`;
+
+    const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}\n🔗 Ürün Linki: ${productUrl}`;
     
     navigator.clipboard.writeText(text).then(() => {
-        alert("✅ Sipariş detayı panoya kopyalandı!\n\nInstagram açıldığında mesaj kutusuna basılı tutup 'Yapıştır' diyerek gönderebilirsiniz.");
-        // Doğrudan homeucuzluk sohbet ekranını açar
+        alert("✅ Sipariş detayı ve ürün linki panoya kopyalandı!\n\nInstagram açıldığında mesaj kutusuna basılı tutup 'Yapıştır' diyerek gönderebilirsiniz.");
         window.open('https://ig.me/m/homeucuzluk', '_blank');
     }).catch(() => {
         window.open('https://ig.me/m/homeucuzluk', '_blank');
     });
 }
-
 
 async function removeProduct(id) {
     if (confirm("Bu içeriği silmek istediğinize emin misiniz?")) {

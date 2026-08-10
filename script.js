@@ -1,5 +1,8 @@
 let products = JSON.parse(localStorage.getItem('homeucuzluk_products')) || [];
 
+// 🔒 YÖNETİM PANELİ ŞİFRESİ
+const ADMIN_PASSWORD = "14531453"; 
+
 document.addEventListener('DOMContentLoaded', () => {
     renderProducts();
     
@@ -71,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Ürünleri Listeleme ve Otomatik/Manuel Yönetim
+// Ürünleri Listeleme
 function renderProducts() {
     const catalogGrid = document.getElementById('insert-grid');
     const productGrid = document.getElementById('product-grid');
@@ -84,7 +87,7 @@ function renderProducts() {
     const today = new Date().toISOString().split('T')[0];
 
     products.forEach(item => {
-        // Yönetim paneli listesi (Süresi geçse bile admin görebilsin ve silsin diye burada listelenir)
+        // Admin Liste Yönetimi
         const adminItem = document.createElement('div');
         adminItem.className = 'admin-item';
         adminItem.innerHTML = `
@@ -93,13 +96,12 @@ function renderProducts() {
         `;
         adminList.appendChild(adminItem);
 
-        // Tarihi geçmiş ürünleri yayından otomatik gizle
+        // Süresi geçenleri müşteri vitrininde gizle
         if (item.expiry < today) return;
 
         const card = document.createElement('div');
         card.className = 'product-card';
         
-        // Instagram DM otomatik mesaj bağlantısı
         const dmMessage = encodeURIComponent(`Merhaba, "${item.title}" (${item.price} ₺) ürününüzü sipariş etmek istiyorum. Kargo durumu: ${item.shipping}`);
         const instagramDmUrl = `https://ig.me/m/homeucuzluk?text=${dmMessage}`;
 
@@ -123,7 +125,7 @@ function renderProducts() {
     });
 }
 
-// Ürün Silme / Erken Kaldırma Fonksiyonu
+// Güvenli Silme Fonksiyonu
 function deleteProduct(id) {
     if (confirm("Bu ürünü/inserti yayından kaldırmak istediğinizden emin misiniz?")) {
         products = products.filter(p => p.id !== id);
@@ -132,6 +134,7 @@ function deleteProduct(id) {
     }
 }
 
+// Sekme Değiştirme
 function switchTab(tab) {
     if (tab === 'catalog') {
         document.getElementById('catalog-section').classList.remove('hidden');
@@ -142,6 +145,23 @@ function switchTab(tab) {
     }
 }
 
+// 🔒 ŞİFRE KONTROLLÜ YÖNETİM PANELİ AÇMA
 function toggleAdminPanel() {
-    document.getElementById('admin-panel').classList.toggle('hidden');
+    const adminPanel = document.getElementById('admin-panel');
+    
+    // Eğer panel zaten açıksa kapat
+    if (!adminPanel.classList.contains('hidden')) {
+        adminPanel.classList.add('hidden');
+        return;
+    }
+
+    // Panel kapalıysa şifre sor
+    const inputPassword = prompt("Lütfen Yönetici Şifresini Giriniz:");
+
+    if (inputPassword === ADMIN_PASSWORD) {
+        adminPanel.classList.remove('hidden');
+        alert("Yönetici girişi başarılı!");
+    } else if (inputPassword !== null) {
+        alert("❌ Hatalı şifre! Yönetim paneline erişim reddedildi.");
+    }
 }

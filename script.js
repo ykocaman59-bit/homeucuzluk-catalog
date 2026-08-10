@@ -13,7 +13,7 @@ function formatDate(dateStr) {
     return dateStr;
 }
 
-// IndexedDB Kurulumu
+// IndexedDB Kurulumu (Depolama Alanı)
 function initDB() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open("HomeUcuzlukDB", 1);
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     checkAuthStatus();
     renderProducts();
 
-    // Görsel Yüklendiğinde Metin Tarama
+    // Görsel Yüklendiğinde OCR ile Metin Tarama
     document.getElementById('image-input').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Form Gönderimi
+    // Form Gönderimi (Ürün / İnsert Ekleme)
     document.getElementById('add-product-form').addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -111,6 +111,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 
+// Veritabanı Fonksiyonları
 function saveProductToDB(product) {
     return new Promise((resolve, reject) => {
         const tx = db.transaction("products", "readwrite");
@@ -139,6 +140,7 @@ function deleteProductFromDB(id) {
     });
 }
 
+// Görsel Sıkıştırma
 function compressImage(file, maxWidth, quality) {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -166,6 +168,7 @@ function compressImage(file, maxWidth, quality) {
     });
 }
 
+// Ekran Rendering (Ürün Listeleme & Katalog)
 async function renderProducts() {
     const products = await getAllProductsFromDB();
 
@@ -186,6 +189,7 @@ async function renderProducts() {
     const insertGroups = {};
 
     products.forEach(item => {
+        // Admin Liste Alanı
         const adminItem = document.createElement('div');
         adminItem.className = 'admin-item';
         adminItem.innerHTML = `
@@ -233,7 +237,7 @@ async function renderProducts() {
         document.getElementById('bitis-tarihi').innerText = formatDate(activeGroup.expiry);
 
         activeGroup.items.forEach((item, idx) => {
-            // Katalog Sağa/Sola Kaydırmalı Resimler
+            // Katalog Resim Slaytı
             const slide = document.createElement('div');
             slide.className = 'slide';
             slide.innerHTML = `<img src="${item.image}" alt="${item.title}">`;
@@ -244,7 +248,7 @@ async function renderProducts() {
             nokta.onclick = () => suankiSayfa(idx);
             noktalarKutusu.appendChild(nokta);
 
-            // Kataloğun Dışında/Altında Dizilecek Ürün Kartları
+            // Mavi Kataloğun Altında Listelenecek Kartlar
             const catalogProductCard = createProductCard(item);
             catalogProductsGrid.appendChild(catalogProductCard);
         });
@@ -263,9 +267,12 @@ async function renderProducts() {
     }
 }
 
+// Ürün Kartı Oluşturucu
 function createProductCard(item) {
     const card = document.createElement('div');
     card.className = 'product-card';
+    const safeTitle = (item.title || '').replace(/'/g, "\\'");
+    
     card.innerHTML = `
         <img src="${item.image}" alt="${item.title}">
         <div class="product-card-body">
@@ -276,7 +283,7 @@ function createProductCard(item) {
                 <span class="badge badge-shipping">${item.shipping}</span>
             </div>
             <p style="font-size:0.85rem; color:#666; margin-bottom:8px;">${item.desc || ''}</p>
-            <button onclick="orderViaInstagram('${item.title}', '${item.price}', '${item.shipping}')" class="dm-btn">
+            <button onclick="orderViaInstagram('${safeTitle}', '${item.price}', '${item.shipping}', '${item.id}')" class="dm-btn">
                 💬 Instagram DM ile Sipariş Et
             </button>
         </div>
@@ -284,6 +291,37 @@ function createProductCard(item) {
     return card;
 }
 
+// Pop-Up Engeline Takılmayan Instagram Yönlendirmesi
+function orderViaInstagram(title, price, shipping, productId) {
+    const currentUrl = window.location.href.split('?')[0];
+    const productUrl = `${currentUrl}?product=${productId || encodeURIComponent(title)}`;
+
+    const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}\n🔗 Ürün Linki: ${productUrl}`;
+    
+    navigator.clipboard.writeText(text).then(() => {
+        alert("✅ Sipariş detayı ve ürün linki panoya kopyalandı!\n\nInstagram açıldığında mesaj kutusuna basılı tutup 'Yapıştır' diyerek gönderebilirsiniz.");
+        redirectToInstagramDM();
+    }).catch(() => {
+        redirectToInstagramDM();
+    });
+}
+
+function redirectToInstagramDM() {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // Doğrudan Instagram Sohbet Ekranını Açma Denemesi
+        window.location.href = 'instagram://direct_message?username=homeucuzluk';
+        
+        setTimeout(() => {
+            window.location.href = 'https://ig.me/m/homeucuzluk';
+        }, 1500);
+    } else {
+        window.location.href = 'https://ig.me/m/homeucuzluk';
+    }
+}
+
+// Oturum Yönetimi
 function checkAuthStatus() {
     const isLoggedIn = sessionStorage.getItem('admin_logged_in') === 'true';
     const adminPanel = document.getElementById('admin-panel');
@@ -353,33 +391,6 @@ function suankiSayfa(indeks) {
     noktalar.forEach((n, i) => {
         n.classList.toggle('aktif', i === aktifIndeks);
     });
-}
-
-function orderViaInstagram(title, price, shipping, productId) {
-    // Sitenin mevcut URL'si ve ürün detay bağlantısı
-    const currentUrl = window.location.href.split('?')[0]; // Ana sayfa linki
-    const productUrl = `${currentUrl}?product=${productId || encodeURIComponent(title)}`;
-
-    const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}\n🔗 Ürün Linki: ${productUrl}`;
-    
-    // 1. Yazıyı panoya kopyala
-    navigator.clipboard.writeText(text).then(() => {
-        alert("✅ Sipariş detayı ve ürün linki panoya kopyalandı!\n\nInstagram açıldığında mesaj kutusuna basılı tutup 'Yapıştır' diyerek gönderebilirsiniz.");
-        redirectToInstagramDM();
-    }).catch(() => {
-        redirectToInstagramDM();
-    });
-}
-
-function redirectToInstagramDM() {
-    const appUrl = 'instagram://direct_message?username=homeucuzluk';
-    const webUrl = 'https://ig.me/m/homeucuzluk';
-
-    window.location.href = appUrl;
-
-    setTimeout(() => {
-        window.open(webUrl, '_blank');
-    }, 1200);
 }
 
 async function removeProduct(id) {

@@ -355,17 +355,33 @@ function suankiSayfa(indeks) {
     });
 }
 
-function orderViaInstagram(title, price, shipping) {
-    const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}`;
+function orderViaInstagram(title, price, shipping, productId) {
+    // Sitenin mevcut URL'si ve ürün detay bağlantısı
+    const currentUrl = window.location.href.split('?')[0]; // Ana sayfa linki
+    const productUrl = `${currentUrl}?product=${productId || encodeURIComponent(title)}`;
+
+    const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}\n🔗 Ürün Linki: ${productUrl}`;
     
+    // 1. Yazıyı panoya kopyala
     navigator.clipboard.writeText(text).then(() => {
-        alert("✅ Sipariş detayı panoya kopyalandı!\n\nInstagram açıldığında mesaj kutusuna basılı tutup 'Yapıştır' diyerek gönderebilirsiniz.");
-        // Doğrudan homeucuzluk sohbet ekranını açar
-        window.open('https://ig.me/m/homeucuzluk', '_blank');
+        alert("✅ Sipariş detayı ve ürün linki panoya kopyalandı!\n\nInstagram açıldığında mesaj kutusuna basılı tutup 'Yapıştır' diyerek gönderebilirsiniz.");
+        redirectToInstagramDM();
     }).catch(() => {
-        window.open('https://ig.me/m/homeucuzluk', '_blank');
+        redirectToInstagramDM();
     });
 }
+
+function redirectToInstagramDM() {
+    const appUrl = 'instagram://direct_message?username=homeucuzluk';
+    const webUrl = 'https://ig.me/m/homeucuzluk';
+
+    window.location.href = appUrl;
+
+    setTimeout(() => {
+        window.open(webUrl, '_blank');
+    }, 1200);
+}
+
 async function removeProduct(id) {
     if (confirm("Bu içeriği silmek istediğinize emin misiniz?")) {
         await deleteProductFromDB(id);

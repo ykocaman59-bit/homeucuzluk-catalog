@@ -1,122 +1,186 @@
 const ADMIN_PASSWORD = "14531453";
-let db;
+let db = null;
 let selectedCatalogGroup = null;
 let aktifIndeks = 0;
 
-// IndexedDB Kurulumu (Kapasite Sınırını Kaldıran Depolama)
+// IndexedDB Kurulumu (Arka planda sessizce çalışır)
 function initDB() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         const request = indexedDB.open("HomeUcuzlukDB", 1);
         request.onupgradeneeded = (e) => {
-            db = e.target.result;
-            if (!db.objectStoreNames.contains("products")) {
-                db.createObjectStore("products", { keyPath: "id" });
+            let database = e.target.result;
+            if (!database.objectStoreNames.contains("products")) {
+                database.createObjectStore("products", { keyPath: "id" });
             }
         };
         request.onsuccess = (e) => {
             db = e.target.result;
             resolve(db);
         };
-        request.onerror = (e) => reject(e);
+        request.onerror = () => {
+            console.warn("IndexedDB başlatılamadı, yedek depolama kullanılacak.");
+            resolve(null);
+        };
     });
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    await initDB();
+    // Sayfa yüklenir yüklenir yüklenmez oturum durumunu kontrol et
     checkAuthStatus();
+
+    // Veritabanını başlat ve ürünleri getir
+    await initDB();
     renderProducts();
 
-    // Görsel Yüklendiğinde Dolap Tarzı Otomatik Metin Çekme
-    document.getElementById('image-input').addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    // Görsel Seçimi ve Otomatik Metin Okuma (OCR)
+    const imgInput = document.getElementById('image-input');
+    if (imgInput) {
+        imgInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-        const status = document.getElementById('ocr-status');
-        status.innerText = "⏳ Görsel okunuyor, lütfen bekleyin...";
+            const status = document.getElementById('ocr-status');
+            status.innerText = "⏳ Görsel taranıyor...";
 
-        const compressedImage = await compressImage(file, 900, 0.75);
-        document.getElementById('image-preview').src = compressedImage;
-        document.getElementById('image-preview-container').classList.remove('hidden');
+            const compressedImage = await compressImage(file, 900, 0.75);
+            document.getElementById('image-preview').src = compressedImage;
+            document.getElementById('image-preview-container').classList.remove('hidden');
 
-        try {
-            const worker = await Tesseract.createWorker('tur');
-            const ret = await worker.recognize(file);
-            await worker.terminate();
+            try {
+                if (window.Tesseract) {
+                    const worker = await Tesseract.createWorker('tur');
+                    const ret = await worker.recognize(file);
+                    await worker.terminate();
 
-            const text = ret.data.text.trim();
-            status.innerText = "✅ Görsel başarıyla taranıp bilgiler aktarıldı!";
+                    const text = ret.data.text.trim();
+                    status.innerText = "✅ Görsel taranıp bilgiler aktarıldı!";
 
-            // Fiyat Tespiti
-            const priceMatch = text.match(/(\d+[\.,]?\d*)\s*(TL|tl|₺)/);
-            if (priceMatch) {
-                document.getElementById('price-input').value = priceMatch[1].replace(',', '.');
+                    const priceMatch = text.match(/(\d+[\.,]?\d*)\s*(TL|tl|₺)/);
+                    if (priceMatch) {
+                        document.getElementById('price-input').value = priceMatch[1].replace(',', '.');
+                    }
+
+                    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
+                    if (lines.length > 0) {
+                        document.getElementById('title-input').value = lines[0].substring(0, 60);
+                        document.getElementById('desc-input').value = lines.join(' ');
+                    }
+                } else {
+                    status.innerText = "Görsel yüklendi. Bilgileri doldurabilirsiniz.";
+                }
+            } catch (err) {
+                status.innerText = "Görsel yüklendi. Bilgileri elle tamamlayabilirsiniz.";
+            }
+        });
+    }
+
+    // Form Gönderimi (Kesintisiz Ürün Ekleme)
+    const addForm = document.getElementById('add-product-form');
+    if (addForm) {
+        addForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const type = document.getElementById('type-input').value;
+            const startDate = document.getElementById('start-date-input').value;
+            const expiry = document.getElementById('expiry-input').value;
+
+            if (type === 'insert' && (!startDate || !expiry)) {
+                alert("Lütfen katalog için başlangıç ve bitiş tarihlerini giriniz!");
+                return;
             }
 
-            // Başlık ve Açıklama Tespiti
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
-            if (lines.length > 0) {
-                document.getElementById('title-input').value = lines[0].substring(0, 60);
-                document.getElementById('desc-input').value = lines.join(' ');
-            } else {
-                document.getElementById('desc-input').value = text;
-            }
+            const newProduct = {
+                id: Date.now(),
+                title: document.getElementById('title-input').value,
+                price: document.getElementById('price-input').value,
+                desc: document.getElementById('desc-input').value,
+                condition: document.getElementById('condition-input').value,
+                shipping: document.getElementById('shipping-input').value,
+                type: type,
+                startDate: startDate || '',
+                expiry: expiry || '',
+                image: document.getElementById('image-preview').src
+            };
 
-        } catch (err) {
-            status.innerText = "⚠️ Metin tam okunamadı, bilgileri elle tamamlayabilirsiniz.";
-        }
-    });
+            await saveProductToDB(newProduct);
+            alert("✅ Ürün kaydedildi! Sayfadan çıkmadan yeni bir ürün daha ekleyebilirsiniz.");
 
-    // Form Gönderimi (Tek Seferde Arka Arkaya Ekleme)
-    document.getElementById('add-product-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const type = document.getElementById('type-input').value;
-        const startDate = document.getElementById('start-date-input').value;
-        const expiry = document.getElementById('expiry-input').value;
-
-        if (type === 'insert' && (!startDate || !expiry)) {
-            alert("Lütfen katalog için başlangıç ve bitiş tarihlerini belirtiniz!");
-            return;
-        }
-
-        const newProduct = {
-            id: Date.now(),
-            title: document.getElementById('title-input').value,
-            price: document.getElementById('price-input').value,
-            desc: document.getElementById('desc-input').value,
-            condition: document.getElementById('condition-input').value,
-            shipping: document.getElementById('shipping-input').value,
-            type: type,
-            startDate: startDate || '',
-            expiry: expiry || '',
-            image: document.getElementById('image-preview').src
-        };
-
-        await saveProductToDB(newProduct);
-        alert("✅ Ürün başarıyla eklendi! Yeni bir ürün daha ekleyebilirsiniz.");
-
-        // Formu temizle (Oturum Kapanmaz!)
-        document.getElementById('add-product-form').reset();
-        document.getElementById('image-preview-container').classList.add('hidden');
-        document.getElementById('ocr-status').innerText = "Görsel seçildiğinde bilgiler otomatik taranacaktır...";
-        
-        renderProducts();
-    });
+            document.getElementById('add-product-form').reset();
+            document.getElementById('image-preview-container').classList.add('hidden');
+            renderProducts();
+        });
+    }
 });
 
-// Veritabanı İşlemleri
+// DOĞRUDAN ÇALIŞAN YÖNETİM PANELİ GİRİŞİ
+function handleAuthAction() {
+    const isLoggedIn = sessionStorage.getItem('admin_logged_in') === 'true';
+    const adminPanel = document.getElementById('admin-panel');
+
+    if (isLoggedIn) {
+        // Oturum zaten açıksa paneli gizle/göster yap
+        adminPanel.classList.toggle('hidden');
+    } else {
+        // Oturum kapalıysa ŞİFRE SOR
+        const inputPassword = prompt("Yönetici Şifresini Giriniz:");
+        if (inputPassword === ADMIN_PASSWORD) {
+            sessionStorage.setItem('admin_logged_in', 'true');
+            checkAuthStatus();
+            alert("✅ Yönetici girişi başarılı!");
+        } else if (inputPassword !== null) {
+            alert("❌ Hatalı Şifre!");
+        }
+    }
+}
+
+function checkAuthStatus() {
+    const isLoggedIn = sessionStorage.getItem('admin_logged_in') === 'true';
+    const adminPanel = document.getElementById('admin-panel');
+    const authBtn = document.getElementById('auth-btn');
+
+    if (!adminPanel || !authBtn) return;
+
+    if (isLoggedIn) {
+        adminPanel.classList.remove('hidden');
+        authBtn.innerText = "👤 Yönetim Paneli (Açık)";
+        authBtn.style.background = "#28a745";
+    } else {
+        adminPanel.classList.add('hidden');
+        authBtn.innerText = "⚙️ Yönetim Paneli";
+        authBtn.style.background = "#e50914";
+    }
+}
+
+function logoutAdmin() {
+    sessionStorage.removeItem('admin_logged_in');
+    checkAuthStatus();
+    alert("Oturum kapatıldı.");
+}
+
+// Veritabanı Kayıt İşlemleri
 function saveProductToDB(product) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
+        if (!db) {
+            let localData = JSON.parse(localStorage.getItem('backup_products')) || [];
+            localData.push(product);
+            localStorage.setItem('backup_products', JSON.stringify(localData));
+            resolve();
+            return;
+        }
         const tx = db.transaction("products", "readwrite");
         const store = tx.objectStore("products");
         store.put(product);
         tx.oncomplete = () => resolve();
-        tx.onerror = (e) => reject(e);
     });
 }
 
 function getAllProductsFromDB() {
     return new Promise((resolve) => {
+        if (!db) {
+            let localData = JSON.parse(localStorage.getItem('backup_products')) || [];
+            resolve(localData);
+            return;
+        }
         const tx = db.transaction("products", "readonly");
         const store = tx.objectStore("products");
         const request = store.getAll();
@@ -126,6 +190,13 @@ function getAllProductsFromDB() {
 
 function deleteProductFromDB(id) {
     return new Promise((resolve) => {
+        if (!db) {
+            let localData = JSON.parse(localStorage.getItem('backup_products')) || [];
+            localData = localData.filter(p => p.id !== id);
+            localStorage.setItem('backup_products', JSON.stringify(localData));
+            resolve();
+            return;
+        }
         const tx = db.transaction("products", "readwrite");
         const store = tx.objectStore("products");
         store.delete(id);
@@ -161,7 +232,7 @@ function compressImage(file, maxWidth, quality) {
     });
 }
 
-// Ekranı ve Katalog Gruplarını Yenileme
+// Ekran Yenileme & Katalog Gruplama
 async function renderProducts() {
     const products = await getAllProductsFromDB();
 
@@ -170,6 +241,8 @@ async function renderProducts() {
     const productGrid = document.getElementById('product-grid');
     const adminList = document.getElementById('admin-product-list');
     const tabsContainer = document.getElementById('catalog-tabs');
+
+    if (!slidesContainer) return;
 
     slidesContainer.innerHTML = '';
     noktalarKutusu.innerHTML = '';
@@ -180,11 +253,10 @@ async function renderProducts() {
     const insertGroups = {};
 
     products.forEach(item => {
-        // Admin Liste
         const adminItem = document.createElement('div');
         adminItem.className = 'admin-item';
         adminItem.innerHTML = `
-            <span><b>${item.title}</b> (${item.price} ₺) [${item.type === 'insert' ? 'İnsert: ' + item.startDate + ' / ' + item.expiry : 'Tekil Ürün'}]</span>
+            <span><b>${item.title}</b> (${item.price} ₺) - [${item.type === 'insert' ? item.startDate + ' / ' + item.expiry : 'Tekil Ürün'}]</span>
             <button onclick="removeProduct(${item.id})" style="background:#e50914; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Sil</button>
         `;
         adminList.appendChild(adminItem);
@@ -200,7 +272,6 @@ async function renderProducts() {
             }
             insertGroups[groupKey].items.push(item);
         } else {
-            // Tekil Ürün Kartı (Dolap Tarzı Rozetlerle)
             const card = document.createElement('div');
             card.className = 'product-card';
             card.innerHTML = `
@@ -222,7 +293,6 @@ async function renderProducts() {
         }
     });
 
-    // Tarih Gruplarına Göre Katalog Butonlarını Oluştur
     const groupKeys = Object.keys(insertGroups);
     if (groupKeys.length > 0) {
         if (!selectedCatalogGroup || !insertGroups[selectedCatalogGroup]) {
@@ -241,7 +311,6 @@ async function renderProducts() {
             tabsContainer.appendChild(btn);
         });
 
-        // Seçili Kataloğu Göster
         const activeGroup = insertGroups[selectedCatalogGroup];
         document.getElementById('baslangic-tarihi').innerText = activeGroup.startDate;
         document.getElementById('bitis-tarihi').innerText = activeGroup.expiry;
@@ -271,52 +340,10 @@ async function renderProducts() {
     }
 }
 
-// Oturum Mantığı (Profil gibi açık kalır)
-function checkAuthStatus() {
-    const isLoggedIn = sessionStorage.getItem('admin_logged_in') === 'true';
-    const adminPanel = document.getElementById('admin-panel');
-    const authBtn = document.getElementById('auth-btn');
-
-    if (isLoggedIn) {
-        adminPanel.classList.remove('hidden');
-        authBtn.innerText = "👤 Yönetici Paneli Açık";
-        authBtn.style.background = "#28a745";
-    } else {
-        adminPanel.classList.add('hidden');
-        authBtn.innerText = "⚙️ Yönetim Paneli";
-        authBtn.style.background = "#e50914";
-    }
-}
-
-function handleAuthAction() {
-    const isLoggedIn = sessionStorage.getItem('admin_logged_in') === 'true';
-    if (isLoggedIn) {
-        document.getElementById('admin-panel').classList.toggle('hidden');
-    } else {
-        const inputPassword = prompt("Lütfen Yönetici Şifresini Giriniz:");
-        if (inputPassword === ADMIN_PASSWORD) {
-            sessionStorage.setItem('admin_logged_in', 'true');
-            checkAuthStatus();
-        } else if (inputPassword !== null) {
-            alert("❌ Hatalı şifre!");
-        }
-    }
-}
-
-function logoutAdmin() {
-    sessionStorage.removeItem('admin_logged_in');
-    checkAuthStatus();
-    alert("Yönetici oturumu kapatıldı.");
-}
-
 function toggleDateFields() {
     const type = document.getElementById('type-input').value;
     const dateFields = document.getElementById('date-fields');
-    if (type === 'single') {
-        dateFields.style.display = 'none';
-    } else {
-        dateFields.style.display = 'flex';
-    }
+    dateFields.style.display = (type === 'single') ? 'none' : 'flex';
 }
 
 function sayfaDegistir(yon) {
@@ -333,7 +360,9 @@ function sayfaDegistir(yon) {
 function suankiSayfa(indeks) {
     aktifIndeks = indeks;
     const slidesContainer = document.getElementById('carouselSlides');
-    slidesContainer.style.transform = `translateX(-${aktifIndeks * 100}%)`;
+    if (slidesContainer) {
+        slidesContainer.style.transform = `translateX(-${aktifIndeks * 100}%)`;
+    }
 
     const noktalar = document.querySelectorAll('.nokta');
     noktalar.forEach((n, i) => {
@@ -345,7 +374,7 @@ function orderViaInstagram(title, price, shipping) {
     const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}`;
     
     navigator.clipboard.writeText(text).then(() => {
-        alert("✅ Sipariş detayı panoya kopyalandı!\n\nInstagram açıldığında mesaj bölümüne yapıştırıp gönderebilirsiniz.");
+        alert("✅ Sipariş bilgisi panoya kopyalandı!\n\nInstagram açıldığında mesaj bölümüne yapıştırabilirsiniz.");
         window.open('https://www.instagram.com/direct/inbox/', '_blank');
     }).catch(() => {
         window.open('https://www.instagram.com/homeucuzluk/', '_blank');
@@ -353,7 +382,7 @@ function orderViaInstagram(title, price, shipping) {
 }
 
 async function removeProduct(id) {
-    if (confirm("Bu içeriği silmek istediğinize emin misiniz?")) {
+    if (confirm("Bu ürünü silmek istediğinize emin misiniz?")) {
         await deleteProductFromDB(id);
         renderProducts();
     }

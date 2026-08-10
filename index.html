@@ -3,31 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HomeUcuzluk - Katalog & E-Ticaret</title>
-    
-    <!-- FontAwesome İkon Seti -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- CSS Stil Dosyası -->
+    <title>HomeUcuzluk</title>
     <link rel="stylesheet" href="style.css">
-
-    <!-- Tesseract.org OCR Kütüphanesi (Görsel Metin Taraması İçin) -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
-    <!-- Üst Başlık (Header) -->
     <header class="main-header">
         <div class="logo-container">
             <h1>HomeUcuzluk</h1>
-            <p>İndirimli Ürünler & Fırsat Kataloğu</p>
+            <p>İndirimli Ürün Kataloğu</p>
         </div>
-        <button id="auth-btn" onclick="handleAuthAction()" class="admin-toggle-btn">
-            ⚙️ Yönetim Paneli
-        </button>
+        <button id="auth-btn" onclick="handleAuthAction()" class="admin-toggle-btn">⚙️ Yönetim Paneli</button>
     </header>
 
-    <!-- Yönetim Paneli (Varsayılan Gizli) -->
+    <!-- Yönetim Paneli -->
     <section id="admin-panel" class="admin-section hidden">
         <div class="admin-card">
             <div class="admin-card-header">
@@ -56,7 +46,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Ürün / Broşür Görseli:</label>
+                    <label>Ürün Görseli:</label>
                     <input type="file" id="image-input" accept="image/*" required>
                     <span id="ocr-status" class="status-text"></span>
                 </div>
@@ -67,13 +57,13 @@
 
                 <div class="form-group">
                     <label>Ürün Başlığı:</label>
-                    <input type="text" id="title-input" placeholder="Örn: Paşabahçe Borcam" required>
+                    <input type="text" id="title-input" placeholder="Ürün adı" required>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group half">
                         <label>Fiyat (₺):</label>
-                        <input type="text" id="price-input" placeholder="Örn: 149.90" required>
+                        <input type="text" id="price-input" placeholder="149.90" required>
                     </div>
                     <div class="form-group half">
                         <label>Durum:</label>
@@ -95,81 +85,60 @@
 
                 <div class="form-group">
                     <label>Açıklama:</label>
-                    <textarea id="desc-input" rows="3" placeholder="Ürün detaylarını buraya yazabilirsiniz..."></textarea>
+                    <textarea id="desc-input" rows="3" placeholder="Ürün detayları..."></textarea>
                 </div>
 
-                <button type="submit" class="save-btn">💾 Ürünü Sisteme Kaydet</button>
+                <button type="submit" class="save-btn">💾 Kaydet</button>
             </form>
 
-            <hr style="margin: 25px 0; border:0; border-top: 1px solid #ddd;">
-
-            <h3>🗑️ Mevcut Ürün Listesi ve Silme</h3>
-            <div id="admin-product-list" class="admin-list-container"></div>
+            <hr style="margin: 20px 0;">
+            <h3>🗑️ Ürün Listesi</h3>
+            <div id="admin-product-list"></div>
         </div>
     </section>
 
-    <!-- Ana Menü Sekmeleri -->
+    <!-- Menü Sekmeleri -->
     <nav class="tab-navigation">
         <button class="nav-tab active" onclick="switchTab('catalog')">📅 Fırsat Kataloğu</button>
         <button class="nav-tab" onclick="switchTab('products')">🛍️ Tüm Ürünler</button>
     </nav>
 
-    <!-- KATALOG / BROŞÜR ALANI -->
+    <!-- KATALOG ALANI -->
     <main id="catalog-section" class="content-container">
-        
-        <!-- Aktif Katalog Tarih Grupları Butonları -->
         <div id="catalog-tabs" class="catalog-tabs-wrapper"></div>
 
-        <!-- Broşür/Slayt Gösterimi -->
         <div class="carousel-card">
             <div class="carousel-info-bar">
-                <span>📅 Geçerlilik Tarihi: <b id="baslangic-tarihi">-</b> / <b id="bitis-tarihi">-</b></span>
+                <span>📅 Geçerlilik: <b id="baslangic-tarihi">-</b> / <b id="bitis-tarihi">-</b></span>
             </div>
 
             <div class="carousel-container">
                 <button class="carousel-btn prev-btn" onclick="sayfaDegistir(-1)">❮</button>
-                
                 <div class="carousel-track-wrapper">
-                    <div id="carouselSlides" class="carousel-track">
-                        <!-- Broşür görselleri JavaScript ile buraya eklenecek -->
-                    </div>
+                    <div id="carouselSlides" class="carousel-track"></div>
                 </div>
-
                 <button class="carousel-btn next-btn" onclick="sayfaDegistir(1)">❯</button>
             </div>
 
             <div id="noktalarKutusu" class="carousel-dots"></div>
         </div>
 
-        <!-- KATALOG İÇİNDEKİ ÜRÜNLERİN DM İLE SİPARİŞ LİSTESİ -->
-        <div class="section-title-box">
-            <h2>🏷️ Bu Kataloğa Ait İndirimli Ürünler</h2>
-            <p>Aşağıdaki listeden dilediğiniz ürünü inceleyip direkt Instagram DM ile sipariş edebilirsiniz.</p>
+        <!-- KATALOG ALTINDAKİ DM İLE SİPARİŞ VERME ÜRÜN KARTLARI -->
+        <div style="margin-top:30px;">
+            <h3 style="margin-bottom:15px; color:#333;">🏷️ Kataloğa Ait Ürünler</h3>
+            <div id="catalog-product-grid" class="product-grid"></div>
         </div>
-
-        <div id="catalog-product-grid" class="product-grid">
-            <!-- Kataloğa ait kartlar JavaScript ile buraya otomatik dizilecek -->
-        </div>
-
     </main>
 
     <!-- TEKİL ÜRÜNLER ALANI -->
     <main id="products-section" class="content-container hidden">
-        <div class="section-title-box">
-            <h2>🛍️ Öne Çıkan Ürünlerimiz</h2>
-        </div>
-        <div id="product-grid" class="product-grid">
-            <!-- Tekil Ürünler JavaScript ile buraya gelecek -->
-        </div>
+        <div id="product-grid" class="product-grid"></div>
     </main>
 
-    <!-- Alt Bilgi (Footer) -->
     <footer class="main-footer">
-        <p>© 2026 <b>HomeUcuzluk</b> - Tüm Hakları Saklıdır.</p>
-        <p>Sipariş ve Sorularınız İçin Instagram: <a href="https://www.instagram.com/homeucuzluk/" target="_blank">@homeucuzluk</a></p>
+        <p>© HomeUcuzluk - Instagram: <a href="https://www.instagram.com/homeucuzluk/" target="_blank">@homeucuzluk</a></p>
     </footer>
 
-    <!-- Script Bağlantısı -->
     <script src="script.js"></script>
 </body>
 </html>

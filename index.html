@@ -10,7 +10,6 @@
 </head>
 <body>
 
-    <!-- Üst Bilgi / Header -->
     <header class="main-header">
         <div class="logo">
             <h1>HomeUcuzluk</h1>
@@ -18,16 +17,16 @@
         </div>
         <nav>
             <button onclick="switchTab('catalog')">🛒 Aktüel İnsertler</button>
-            <button onclick="switchTab('products')">📦 Tüm Ürünler</button>
+            <button onclick="switchTab('products')">📦 Tekil Ürünler</button>
             <button onclick="toggleAdminPanel()" class="admin-btn">⚙️ Yönetim Paneli</button>
         </nav>
     </header>
 
     <main class="container">
         
-        <!-- YÖNETİM PANELİ (Ürün / İnsert Ekleme) -->
+        <!-- YÖNETİM PANELİ -->
         <section id="admin-panel" class="card hidden">
-            <h2>➕ Yeni İnsert / Ürün Ekle</h2>
+            <h2>➕ Ürün veya Çoklu İnsert Ekle</h2>
             <form id="add-product-form">
                 
                 <div class="form-group">
@@ -53,24 +52,24 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Ürün Açıklaması / Özellikleri:</label>
-                    <textarea id="desc-input" rows="3" placeholder="Ürün detaylarını girin..."></textarea>
+                    <label>Ürün Açıklaması / Çoklu Ürün Listesi:</label>
+                    <textarea id="desc-input" rows="3" placeholder="Ürün detaylarını veya çoklu ürün listesini girin..."></textarea>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
                         <label>Kargo Durumu:</label>
                         <select id="shipping-input">
-                            <option value="Alıcıya Ait">Kargo Alıcıya Ait</option>
-                            <option value="Satıcıya Ait (Ücretsiz Kargo)">Ücretsiz Kargo (Satıcıya Ait)</option>
+                            <option value="Kargo Alıcıya Ait">Kargo Alıcıya Ait</option>
+                            <option value="Ücretsiz Kargo (Satıcıya Ait)">Ücretsiz Kargo (Satıcıya Ait)</option>
                         </select>
                     </div>
 
                     <div class="form-group">
-                        <label>Yayın Tipi:</label>
+                        <label>Yayın Tipi (Görünüm):</label>
                         <select id="type-input">
-                            <option value="single">Tekil Ürün</option>
-                            <option value="insert">Market İnsertü / Kataloğu</option>
+                            <option value="single">Tekil Ürün Paylaşımı</option>
+                            <option value="insert">Market İnsertü / Çoklu Katalog</option>
                         </select>
                     </div>
                 </div>
@@ -82,19 +81,24 @@
                     </div>
                 </div>
 
-                <button type="submit" class="primary-btn">Kaydet ve Yayınla</button>
+                <button type="submit" class="primary-btn">Sisteme Ekle ve Yayınla</button>
             </form>
+
+            <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #ddd;">
+            
+            <h3>📋 Eklenen Ürünleri Yönet / Erken Sil</h3>
+            <div id="admin-product-list" class="admin-list"></div>
         </section>
 
         <!-- İNSERT / KATALOG VİTRİNİ -->
         <section id="catalog-section">
-            <h2>🔥 Güncel Fırsat İnsertleri</h2>
+            <h2>🔥 Aktüel İnsertler ve Çoklu Kataloglar</h2>
             <div id="insert-grid" class="grid"></div>
         </section>
 
         <!-- TEKİL ÜRÜNLER VİTRİNİ -->
         <section id="products-section" class="hidden">
-            <h2>🛍️ Tüm Ürünler</h2>
+            <h2>🛍️ Tekil Ürün Paylaşımları</h2>
             <div id="product-grid" class="grid"></div>
         </section>
 
@@ -103,4 +107,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-

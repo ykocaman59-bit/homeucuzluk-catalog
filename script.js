@@ -359,12 +359,14 @@ function orderViaInstagram(title, price, shipping) {
     const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}`;
     
     navigator.clipboard.writeText(text).then(() => {
-        alert("✅ Sipariş detayı panoya kopyalandı!\n\nInstagram açıldığında mesaj bölümüne yapıştırıp gönderebilirsiniz.");
-        window.open('https://www.instagram.com/direct/inbox/', '_blank');
+        alert("✅ Sipariş detayı panoya kopyalandı!\n\nInstagram açıldığında mesaj kutusuna basılı tutup 'Yapıştır' diyerek gönderebilirsiniz.");
+        // Doğrudan homeucuzluk sohbet ekranını açar
+        window.open('https://ig.me/m/homeucuzluk', '_blank');
     }).catch(() => {
-        window.open('https://www.instagram.com/homeucuzluk/', '_blank');
+        window.open('https://ig.me/m/homeucuzluk', '_blank');
     });
 }
+
 
 async function removeProduct(id) {
     if (confirm("Bu içeriği silmek istediğinize emin misiniz?")) {

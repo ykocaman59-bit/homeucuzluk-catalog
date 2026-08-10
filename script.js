@@ -13,7 +13,7 @@ function formatDate(dateStr) {
     return dateStr;
 }
 
-// IndexedDB Kurulumu (Depolama Alanı)
+// IndexedDB Kurulumu
 function initDB() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open("HomeUcuzlukDB", 1);
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     checkAuthStatus();
     renderProducts();
 
-    // Görsel Yüklendiğinde OCR ile Metin Tarama
+    // Görsel Yüklendiğinde Metin Tarama
     document.getElementById('image-input').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Form Gönderimi (Ürün / İnsert Ekleme)
+    // Form Gönderimi
     document.getElementById('add-product-form').addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -111,7 +111,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 
-// Veritabanı Fonksiyonları
 function saveProductToDB(product) {
     return new Promise((resolve, reject) => {
         const tx = db.transaction("products", "readwrite");
@@ -140,7 +139,6 @@ function deleteProductFromDB(id) {
     });
 }
 
-// Görsel Sıkıştırma
 function compressImage(file, maxWidth, quality) {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -168,7 +166,6 @@ function compressImage(file, maxWidth, quality) {
     });
 }
 
-// Ekran Rendering (Ürün Listeleme & Katalog)
 async function renderProducts() {
     const products = await getAllProductsFromDB();
 
@@ -189,7 +186,6 @@ async function renderProducts() {
     const insertGroups = {};
 
     products.forEach(item => {
-        // Admin Liste Alanı
         const adminItem = document.createElement('div');
         adminItem.className = 'admin-item';
         adminItem.innerHTML = `
@@ -237,7 +233,7 @@ async function renderProducts() {
         document.getElementById('bitis-tarihi').innerText = formatDate(activeGroup.expiry);
 
         activeGroup.items.forEach((item, idx) => {
-            // Katalog Resim Slaytı
+            // Katalog Sağa/Sola Kaydırmalı Resimler
             const slide = document.createElement('div');
             slide.className = 'slide';
             slide.innerHTML = `<img src="${item.image}" alt="${item.title}">`;
@@ -248,7 +244,7 @@ async function renderProducts() {
             nokta.onclick = () => suankiSayfa(idx);
             noktalarKutusu.appendChild(nokta);
 
-            // Mavi Kataloğun Altında Listelenecek Kartlar
+            // Kataloğun Dışında/Altında Dizilecek Ürün Kartları
             const catalogProductCard = createProductCard(item);
             catalogProductsGrid.appendChild(catalogProductCard);
         });
@@ -267,12 +263,9 @@ async function renderProducts() {
     }
 }
 
-// Ürün Kartı Oluşturucu
 function createProductCard(item) {
     const card = document.createElement('div');
     card.className = 'product-card';
-    const safeTitle = (item.title || '').replace(/'/g, "\\'");
-    
     card.innerHTML = `
         <img src="${item.image}" alt="${item.title}">
         <div class="product-card-body">
@@ -283,7 +276,7 @@ function createProductCard(item) {
                 <span class="badge badge-shipping">${item.shipping}</span>
             </div>
             <p style="font-size:0.85rem; color:#666; margin-bottom:8px;">${item.desc || ''}</p>
-            <button onclick="orderViaInstagram('${safeTitle}', '${item.price}', '${item.shipping}', '${item.id}')" class="dm-btn">
+            <button onclick="orderViaInstagram('${item.title}', '${item.price}', '${item.shipping}')" class="dm-btn">
                 💬 Instagram DM ile Sipariş Et
             </button>
         </div>
@@ -291,27 +284,6 @@ function createProductCard(item) {
     return card;
 }
 
-// Doğrudan Instagram Uygulamasını Tetikleyen Yapı
-function orderViaInstagram(title, price, shipping, productId) {
-    const currentUrl = window.location.href.split('?')[0];
-    const productUrl = `${currentUrl}?product=${productId || encodeURIComponent(title)}`;
-
-    const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}\n🔗 Ürün Linki: ${productUrl}`;
-    
-    navigator.clipboard.writeText(text).then(() => {
-        alert("✅ Sipariş detayı ve ürün linki panoya kopyalandı!\n\nInstagram açıldığında mesaj kutusuna basılı tutup 'Yapıştır' diyerek gönderebilirsiniz.");
-        redirectToInstagramDM();
-    }).catch(() => {
-        redirectToInstagramDM();
-    });
-}
-
-function redirectToInstagramDM() {
-    // Sadece doğrudan uygulamayı tetikleyen deep-link protokolü (Web tarayıcıya düşmez)
-    window.location.href = 'instagram://direct_message?username=homeucuzluk';
-}
-
-// Oturum Yönetimi
 function checkAuthStatus() {
     const isLoggedIn = sessionStorage.getItem('admin_logged_in') === 'true';
     const adminPanel = document.getElementById('admin-panel');
@@ -383,6 +355,17 @@ function suankiSayfa(indeks) {
     });
 }
 
+function orderViaInstagram(title, price, shipping) {
+    const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}`;
+    
+    navigator.clipboard.writeText(text).then(() => {
+        alert("✅ Sipariş detayı panoya kopyalandı!\n\nInstagram açıldığında mesaj bölümüne yapıştırıp gönderebilirsiniz.");
+        window.open('https://www.instagram.com/direct/inbox/', '_blank');
+    }).catch(() => {
+        window.open('https://www.instagram.com/homeucuzluk/', '_blank');
+    });
+}
+
 async function removeProduct(id) {
     if (confirm("Bu içeriği silmek istediğinize emin misiniz?")) {
         await deleteProductFromDB(id);
@@ -399,4 +382,3 @@ function switchTab(tab) {
         document.getElementById('products-section').classList.remove('hidden');
     }
 }
-    

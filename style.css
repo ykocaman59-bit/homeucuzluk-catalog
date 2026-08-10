@@ -64,8 +64,7 @@ input, select, textarea {
     width: 100%;
 }
 
-/* Ürün Kartları Düzeni */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }
 .product-card {
     background: white;
     border-radius: 8px;
@@ -75,22 +74,45 @@ input, select, textarea {
     flex-direction: column;
 }
 
-.product-card img { width: 100%; height: 220px; object-fit: cover; }
+.product-card img { width: 100%; height: 240px; object-fit: cover; }
 .product-info { padding: 1rem; flex: 1; display: flex; flex-direction: column; }
-.price-tag { font-size: 1.3rem; font-weight: bold; color: var(--primary); margin: 0.5rem 0; }
-.badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; }
+.price-tag { font-size: 1.4rem; font-weight: bold; color: var(--primary); margin: 0.5rem 0; }
+.badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; margin-bottom: 0.5rem; }
 .badge-shipping { background: #e0f2fe; color: #0369a1; }
 .expiry-tag { font-size: 0.75rem; color: #777; margin-top: auto; padding-top: 0.5rem; }
 
-.buy-btn {
+.dm-btn {
     display: block;
     text-align: center;
-    background: #25D366; /* WhatsApp yeşili */
+    background: linear-divider;
+    background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
     color: white;
     text-decoration: none;
-    padding: 0.6rem;
+    padding: 0.7rem;
     border-radius: 4px;
-    margin-top: 0.5rem;
+    margin-top: 0.8rem;
     font-weight: bold;
+    font-size: 0.95rem;
 }
 
+/* Yönetim Paneli Liste Tasarımı */
+.admin-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8f9fa;
+    padding: 0.8rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+}
+.delete-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+.delete-btn:hover { background: #dc2626; }

@@ -28,7 +28,15 @@ function formatDate(dateStr) {
 
 document.addEventListener('DOMContentLoaded', async () => {
     checkAuthStatus();
-    renderProducts();
+    await renderProducts();
+
+    // URL'den gelen ?product=ID veya isim parametresini kontrol et
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetProductId = urlParams.get('product');
+
+    if (targetProductId) {
+        openTargetProduct(targetProductId);
+    }
 
     // Görsel Yüklendiğinde Metin Tarama
     document.getElementById('image-input').addEventListener('change', async (e) => {
@@ -102,7 +110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('image-preview-container').classList.add('hidden');
             document.getElementById('ocr-status').innerText = "Görsel seçildiğinde bilgiler otomatik taranacaktır...";
             
-            renderProducts();
+            await renderProducts();
         } catch (error) {
             alert("❌ Ürün eklenirken bir hata oluştu: " + error.message);
         }
@@ -165,8 +173,11 @@ function compressImage(file, maxWidth, quality) {
     });
 }
 
+let allProductsCache = []; // Ürünleri aramak için saklama alanı
+
 async function renderProducts() {
     const products = await getAllProductsFromDB();
+    allProductsCache = products;
 
     const slidesContainer = document.getElementById('carouselSlides');
     const noktalarKutusu = document.getElementById('noktalarKutusu');
@@ -262,9 +273,43 @@ async function renderProducts() {
     }
 }
 
+// Linkle Gelen Ürünü Otomatik Bulup İlgili Kataloğa Geçen Fonksiyon
+function openTargetProduct(targetIdOrName) {
+    const foundProduct = allProductsCache.find(p => p.id === targetIdOrName || p.title === targetIdOrName);
+    
+    if (!foundProduct) return;
+
+    if (foundProduct.type === 'single') {
+        switchTab('products');
+    } else if (foundProduct.type === 'insert') {
+        switchTab('catalog');
+        const targetGroupKey = `${foundProduct.startDate}_${foundProduct.expiry}`;
+        if (selectedCatalogGroup !== targetGroupKey) {
+            selectedCatalogGroup = targetGroupKey;
+            renderProducts();
+        }
+    }
+
+    // Ürün Kartına Yavaşça Kaydır ve Vurgula (Sarı Efekt)
+    setTimeout(() => {
+        const productCard = document.getElementById(`prod-card-${foundProduct.id}`);
+        if (productCard) {
+            productCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            productCard.style.transition = "all 0.5s ease";
+            productCard.style.boxShadow = "0 0 20px 5px #ffb703";
+            productCard.style.border = "2px solid #ffb703";
+            setTimeout(() => {
+                productCard.style.boxShadow = "";
+                productCard.style.border = "";
+            }, 3000);
+        }
+    }, 500);
+}
+
 function createProductCard(item) {
     const card = document.createElement('div');
     card.className = 'product-card';
+    card.id = `prod-card-${item.id}`; // Tıklayınca doğrudan bu karta odaklanabilmek için ID verdik
     const safeTitle = (item.title || '').replace(/'/g, "\\'");
     
     card.innerHTML = `
@@ -358,7 +403,7 @@ function suankiSayfa(indeks) {
 
 function orderViaInstagram(title, price, shipping, productId) {
     const currentUrl = window.location.href.split('?')[0];
-    const productUrl = `${currentUrl}?product=${productId || encodeURIComponent(title)}`;
+    const productUrl = `${currentUrl}?product=${productId}`;
 
     const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}\n🔗 Ürün Linki: ${productUrl}`;
     
@@ -373,7 +418,7 @@ function orderViaInstagram(title, price, shipping, productId) {
 async function removeProduct(id) {
     if (confirm("Bu içeriği silmek istediğinize emin misiniz?")) {
         await deleteProductFromDB(id);
-        renderProducts();
+        await renderProducts();
     }
 }
 

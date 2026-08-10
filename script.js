@@ -15,8 +15,8 @@ const db = firebase.firestore();
 const ADMIN_PASSWORD = "14531453";
 let selectedCatalogGroup = null;
 let aktifIndeks = 0;
-let selectedRating = 5; // Varsayılan 5 Yıldız
 
+// Tarihi YYYY-AA-GG formatından GG.AA.YYYY formatına çevirir
 function formatDate(dateStr) {
     if (!dateStr) return '';
     const parts = dateStr.split('-');
@@ -29,9 +29,8 @@ function formatDate(dateStr) {
 document.addEventListener('DOMContentLoaded', async () => {
     checkAuthStatus();
     await renderProducts();
-    await renderReviews();
 
-    // URL'den gelen ?product=ID parametresi
+    // URL'den gelen ?product=ID veya isim parametresini kontrol et
     const urlParams = new URLSearchParams(window.location.search);
     const targetProductId = urlParams.get('product');
 
@@ -39,8 +38,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         openTargetProduct(targetProductId);
     }
 
-    // OCR Taraması
-    document.getElementById('image-input')?.addEventListener('change', async (e) => {
+    // Görsel Yüklendiğinde Metin Tarama
+    document.getElementById('image-input').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
@@ -77,8 +76,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Ürün Ekleme Formu
-    document.getElementById('add-product-form')?.addEventListener('submit', async (e) => {
+    // Form Gönderimi (Firebase'e Kayıt)
+    document.getElementById('add-product-form').addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const type = document.getElementById('type-input').value;
@@ -104,188 +103,47 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
 
         try {
-            await db.collection("products").add(newProduct);
+            await saveProductToDB(newProduct);
             alert("✅ Ürün başarıyla canlı veritabanına eklendi!");
 
             document.getElementById('add-product-form').reset();
             document.getElementById('image-preview-container').classList.add('hidden');
+            document.getElementById('ocr-status').innerText = "Görsel seçildiğinde bilgiler otomatik taranacaktır...";
+            
             await renderProducts();
         } catch (error) {
             alert("❌ Ürün eklenirken bir hata oluştu: " + error.message);
         }
     });
-
-    // Müşteri Yorum Formu Gönderimi
-    document.getElementById('add-review-form')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const newReview = {
-            createdAt: Date.now(),
-            name: document.getElementById('review-name').value,
-            rating: selectedRating,
-            text: document.getElementById('review-text').value,
-            media: document.getElementById('review-media').value || '',
-            adminReply: ''
-        };
-
-        try {
-            await db.collection("reviews").add(newReview);
-            alert("✅ Değerlendirmeniz için teşekkür ederiz!");
-
-            document.getElementById('add-review-form').reset();
-            setRating(5);
-            await renderReviews();
-        } catch (error) {
-            alert("❌ Yorum gönderilirken hata oluştu: " + error.message);
-        }
-    });
 });
 
-// Yıldız Seçme Fonksiyonu
-function setRating(rating) {
-    selectedRating = rating;
-    const stars = document.querySelectorAll('.star-rating-input .star');
-    stars.forEach((s, idx) => {
-        if (idx < rating) {
-            s.classList.add('selected');
-        } else {
-            s.classList.remove('selected');
-        }
-    });
+// Firebase Veritabanına Ürün Ekleme
+async function saveProductToDB(product) {
+    await db.collection("products").add(product);
 }
 
-// Yorumları Veritabanından Getirip Çizme
-async function renderReviews() {
-    const list = document.getElementById('reviews-list');
-    if (!list) return;
-
-    list.innerHTML = '⏳ Yorumlar yükleniyor...';
-
-    try {
-        const snapshot = await db.collection("reviews").orderBy("createdAt", "desc").get();
-        list.innerHTML = '';
-
-        if (snapshot.empty) {
-            list.innerHTML = '<p style="text-align:center; color:#777;">Henüz değerlendirme yapılmamış. İlk yorumu siz yapın!</p>';
-            return;
-        }
-
-        const isLoggedIn = sessionStorage.getItem('admin_logged_in') === 'true';
-
-        snapshot.forEach(doc => {
-            const r = doc.data();
-            const id = doc.id;
-
-            let starsHtml = '';
-            for (let i = 1; i <= 5; i++) {
-                starsHtml += i <= r.rating ? '★' : '☆';
-            }
-
-            let mediaHtml = '';
-            if (r.media) {
-                if (r.media.includes('youtube') || r.media.includes('youtu.be')) {
-                    mediaHtml = `<p><a href="${r.media}" target="_blank" style="color:#e50914;">▶️ Videoyu İzle</a></p>`;
-                } else {
-                    mediaHtml = `<img src="${r.media}" style="max-width:100%; max-height:200px; border-radius:8px; margin-top:8px;">`;
-                }
-            }
-
-            let replyHtml = '';
-            if (r.adminReply) {
-                replyHtml = `
-                    <div class="admin-reply-box">
-                        <b>🏪 HomeUcuzluk Yanıtı:</b>
-                        <p>${r.adminReply}</p>
-                    </div>
-                `;
-            }
-
-            let adminActionBtn = '';
-            if (isLoggedIn) {
-                adminActionBtn = `
-                    <div style="margin-top:10px;">
-                        <button onclick="replyToReview('${id}')" style="background:#007bff; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">💬 Yanıtla</button>
-                        <button onclick="deleteReview('${id}')" style="background:#dc3545; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; margin-left:5px;">Sil</button>
-                    </div>
-                `;
-            }
-
-            const card = document.createElement('div');
-            card.className = 'review-card';
-            card.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <b>${r.name}</b>
-                    <span style="color:#ffb703; font-size:1.2rem;">${starsHtml}</span>
-                </div>
-                <p style="color:#444; margin-bottom:8px;">${r.text}</p>
-                ${mediaHtml}
-                ${replyHtml}
-                ${adminActionBtn}
-            `;
-            list.appendChild(card);
-        });
-
-    } catch (err) {
-        console.error("Yorum çekme hatası:", err);
-    }
-}
-
-// Yönetici Yorum Yanıtlama
-async function replyToReview(id) {
-    const reply = prompt("Müşteriye verilecek yanıtı yazınız:");
-    if (reply) {
-        await db.collection("reviews").doc(id).update({ adminReply: reply });
-        alert("✅ Yanıtınız eklendi!");
-        await renderReviews();
-    }
-}
-
-// Yönetici Yorum Silme
-async function deleteReview(id) {
-    if (confirm("Bu yorumu silmek istediğinizden emin misiniz?")) {
-        await db.collection("reviews").doc(id).delete();
-        await renderReviews();
-    }
-}
-
-function switchTab(tab) {
-    const catalog = document.getElementById('catalog-section');
-    const products = document.getElementById('products-section');
-    const reviews = document.getElementById('reviews-section');
-    const btns = document.querySelectorAll('.nav-btn');
-
-    btns.forEach(b => b.classList.remove('active'));
-
-    if (tab === 'catalog') {
-        catalog.classList.remove('hidden');
-        products.classList.add('hidden');
-        reviews.classList.add('hidden');
-        btns[0].classList.add('active');
-    } else if (tab === 'products') {
-        catalog.classList.add('hidden');
-        products.classList.remove('hidden');
-        reviews.classList.add('hidden');
-        btns[1].classList.add('active');
-    } else if (tab === 'reviews') {
-        catalog.classList.add('hidden');
-        products.classList.add('hidden');
-        reviews.classList.remove('hidden');
-        btns[2].classList.add('active');
-    }
-}
-
-// --- Eski Diğer Yardımcı Fonksiyonlar ---
+// Firebase Veritabanından Tüm Ürünleri Çekme
 async function getAllProductsFromDB() {
     try {
         const snapshot = await db.collection("products").orderBy("createdAt", "desc").get();
         let products = [];
-        snapshot.forEach(doc => { products.push({ id: doc.id, ...doc.data() }); });
+        snapshot.forEach(doc => {
+            products.push({ id: doc.id, ...doc.data() });
+        });
         return products;
-    } catch (error) { return []; }
+    } catch (error) {
+        console.error("Veri çekme hatası:", error);
+        return [];
+    }
 }
 
+// Firebase Veritabanından Ürün Silme
 async function deleteProductFromDB(id) {
-    await db.collection("products").doc(id).delete();
+    try {
+        await db.collection("products").doc(id).delete();
+    } catch (error) {
+        console.error("Silme hatası:", error);
+    }
 }
 
 function compressImage(file, maxWidth, quality) {
@@ -299,10 +157,12 @@ function compressImage(file, maxWidth, quality) {
                 const canvas = document.createElement('canvas');
                 let width = img.width;
                 let height = img.height;
+
                 if (width > maxWidth) {
                     height = Math.round((height * maxWidth) / width);
                     width = maxWidth;
                 }
+
                 canvas.width = width;
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
@@ -313,7 +173,7 @@ function compressImage(file, maxWidth, quality) {
     });
 }
 
-let allProductsCache = [];
+let allProductsCache = []; // Ürünleri aramak için saklama alanı
 
 async function renderProducts() {
     const products = await getAllProductsFromDB();
@@ -325,8 +185,6 @@ async function renderProducts() {
     const catalogProductsGrid = document.getElementById('catalog-products-grid');
     const adminList = document.getElementById('admin-product-list');
     const tabsContainer = document.getElementById('catalog-tabs');
-
-    if(!slidesContainer) return;
 
     slidesContainer.innerHTML = '';
     noktalarKutusu.innerHTML = '';
@@ -341,7 +199,7 @@ async function renderProducts() {
         const adminItem = document.createElement('div');
         adminItem.className = 'admin-item';
         adminItem.innerHTML = `
-            <span><b>${item.title}</b> (${item.price} ₺)</span>
+            <span><b>${item.title}</b> (${item.price} ₺) [${item.type === 'insert' ? 'İnsert: ' + formatDate(item.startDate) + ' / ' + formatDate(item.expiry) : 'Tekil Ürün'}]</span>
             <button onclick="removeProduct('${item.id}')" style="background:#e50914; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Sil</button>
         `;
         adminList.appendChild(adminItem);
@@ -349,11 +207,16 @@ async function renderProducts() {
         if (item.type === 'insert') {
             const groupKey = `${item.startDate}_${item.expiry}`;
             if (!insertGroups[groupKey]) {
-                insertGroups[groupKey] = { startDate: item.startDate, expiry: item.expiry, items: [] };
+                insertGroups[groupKey] = {
+                    startDate: item.startDate,
+                    expiry: item.expiry,
+                    items: []
+                };
             }
             insertGroups[groupKey].items.push(item);
         } else {
-            productGrid.appendChild(createProductCard(item));
+            const card = createProductCard(item);
+            productGrid.appendChild(card);
         }
     });
 
@@ -380,6 +243,7 @@ async function renderProducts() {
         document.getElementById('bitis-tarihi').innerText = formatDate(activeGroup.expiry);
 
         activeGroup.items.forEach((item, idx) => {
+            // Katalog Sağa/Sola Kaydırmalı Resimler
             const slide = document.createElement('div');
             slide.className = 'slide';
             slide.innerHTML = `<img src="${item.image}" alt="${item.title}">`;
@@ -390,15 +254,29 @@ async function renderProducts() {
             nokta.onclick = () => suankiSayfa(idx);
             noktalarKutusu.appendChild(nokta);
 
-            catalogProductsGrid.appendChild(createProductCard(item));
+            // Kataloğun Dışında/Altında Dizilecek Ürün Kartları
+            const catalogProductCard = createProductCard(item);
+            catalogProductsGrid.appendChild(catalogProductCard);
         });
         aktifIndeks = 0;
         suankiSayfa(0);
+    } else {
+        slidesContainer.innerHTML = `
+            <div class="slide">
+                <div class="bos-alan-yazisi">
+                    <i class="fa-regular fa-images" style="font-size: 36px; display:block; margin-bottom:8px;"></i>
+                    Aktif Katalog Bulunmuyor
+                </div>
+            </div>
+        `;
+        catalogProductsGrid.innerHTML = '<p style="text-align:center; color:#888; width:100%;">Bu katalogda ürün bulunmuyor.</p>';
     }
 }
 
+// Linkle Gelen Ürünü Otomatik Bulup İlgili Kataloğa Geçen Fonksiyon
 function openTargetProduct(targetIdOrName) {
     const foundProduct = allProductsCache.find(p => p.id === targetIdOrName || p.title === targetIdOrName);
+    
     if (!foundProduct) return;
 
     if (foundProduct.type === 'single') {
@@ -412,12 +290,18 @@ function openTargetProduct(targetIdOrName) {
         }
     }
 
+    // Ürün Kartına Yavaşça Kaydır ve Vurgula (Sarı Efekt)
     setTimeout(() => {
         const productCard = document.getElementById(`prod-card-${foundProduct.id}`);
         if (productCard) {
             productCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            productCard.style.transition = "all 0.5s ease";
             productCard.style.boxShadow = "0 0 20px 5px #ffb703";
-            setTimeout(() => { productCard.style.boxShadow = ""; }, 3000);
+            productCard.style.border = "2px solid #ffb703";
+            setTimeout(() => {
+                productCard.style.boxShadow = "";
+                productCard.style.border = "";
+            }, 3000);
         }
     }, 500);
 }
@@ -425,7 +309,7 @@ function openTargetProduct(targetIdOrName) {
 function createProductCard(item) {
     const card = document.createElement('div');
     card.className = 'product-card';
-    card.id = `prod-card-${item.id}`;
+    card.id = `prod-card-${item.id}`; // Tıklayınca doğrudan bu karta odaklanabilmek için ID verdik
     const safeTitle = (item.title || '').replace(/'/g, "\\'");
     
     card.innerHTML = `
@@ -452,11 +336,13 @@ function checkAuthStatus() {
     const authBtn = document.getElementById('auth-btn');
 
     if (isLoggedIn) {
-        adminPanel?.classList.remove('hidden');
-        if(authBtn) authBtn.innerText = "👤 Yönetici Paneli Açık";
+        adminPanel.classList.remove('hidden');
+        authBtn.innerText = "👤 Yönetici Paneli Açık";
+        authBtn.style.background = "#28a745";
     } else {
-        adminPanel?.classList.add('hidden');
-        if(authBtn) authBtn.innerText = "⚙️ Yönetim Paneli";
+        adminPanel.classList.add('hidden');
+        authBtn.innerText = "⚙️ Yönetim Paneli";
+        authBtn.style.background = "#e50914";
     }
 }
 
@@ -469,7 +355,6 @@ function handleAuthAction() {
         if (inputPassword === ADMIN_PASSWORD) {
             sessionStorage.setItem('admin_logged_in', 'true');
             checkAuthStatus();
-            renderReviews();
         } else if (inputPassword !== null) {
             alert("❌ Hatalı şifre!");
         }
@@ -479,7 +364,6 @@ function handleAuthAction() {
 function logoutAdmin() {
     sessionStorage.removeItem('admin_logged_in');
     checkAuthStatus();
-    renderReviews();
     alert("Yönetici oturumu kapatıldı.");
 }
 
@@ -496,9 +380,11 @@ function toggleDateFields() {
 function sayfaDegistir(yon) {
     const slides = document.querySelectorAll('.slide');
     if (slides.length <= 1) return;
+
     aktifIndeks += yon;
     if (aktifIndeks >= slides.length) aktifIndeks = 0;
     if (aktifIndeks < 0) aktifIndeks = slides.length - 1;
+
     suankiSayfa(aktifIndeks);
 }
 
@@ -508,6 +394,7 @@ function suankiSayfa(indeks) {
     if(slidesContainer){
         slidesContainer.style.transform = `translateX(-${aktifIndeks * 100}%)`;
     }
+
     const noktalar = document.querySelectorAll('.nokta');
     noktalar.forEach((n, i) => {
         n.classList.toggle('aktif', i === aktifIndeks);
@@ -521,7 +408,7 @@ function orderViaInstagram(title, price, shipping, productId) {
     const text = `Merhaba @homeucuzluk, web sitenizden şu ürünü sipariş etmek istiyorum:\n\n📦 Ürün: ${title}\n💰 Fiyat: ${price} TL\n🚚 Kargo: ${shipping}\n🔗 Ürün Linki: ${productUrl}`;
     
     navigator.clipboard.writeText(text).then(() => {
-        alert("✅ Sipariş detayı kopyalandı! Instagram mesaj kutusuna yapıştırabilirsiniz.");
+        alert("✅ Sipariş detayı ve ürün linki panoya kopyalandı!\n\nInstagram açıldığında mesaj kutusuna basılı tutup 'Yapıştır' diyerek gönderebilirsiniz.");
         window.open('https://ig.me/m/homeucuzluk', '_blank');
     }).catch(() => {
         window.open('https://ig.me/m/homeucuzluk', '_blank');
@@ -534,3 +421,13 @@ async function removeProduct(id) {
         await renderProducts();
     }
 }
+
+function switchTab(tab) {
+    if (tab === 'catalog') {
+        document.getElementById('catalog-section').classList.remove('hidden');
+        document.getElementById('products-section').classList.add('hidden');
+    } else {
+        document.getElementById('catalog-section').classList.add('hidden');
+        document.getElementById('products-section').classList.remove('hidden');
+    }
+          }

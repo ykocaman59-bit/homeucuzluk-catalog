@@ -291,7 +291,7 @@ function createProductCard(item) {
     return card;
 }
 
-// Pop-Up Engeline Takılmayan Instagram Yönlendirmesi
+// Doğrudan Instagram Uygulamasını Tetikleyen Yapı
 function orderViaInstagram(title, price, shipping, productId) {
     const currentUrl = window.location.href.split('?')[0];
     const productUrl = `${currentUrl}?product=${productId || encodeURIComponent(title)}`;
@@ -307,18 +307,8 @@ function orderViaInstagram(title, price, shipping, productId) {
 }
 
 function redirectToInstagramDM() {
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-        // Doğrudan Instagram Sohbet Ekranını Açma Denemesi
-        window.location.href = 'instagram://direct_message?username=homeucuzluk';
-        
-        setTimeout(() => {
-            window.location.href = 'https://ig.me/m/homeucuzluk';
-        }, 1500);
-    } else {
-        window.location.href = 'https://ig.me/m/homeucuzluk';
-    }
+    // Sadece doğrudan uygulamayı tetikleyen deep-link protokolü (Web tarayıcıya düşmez)
+    window.location.href = 'instagram://direct_message?username=homeucuzluk';
 }
 
 // Oturum Yönetimi
@@ -409,3 +399,4 @@ function switchTab(tab) {
         document.getElementById('products-section').classList.remove('hidden');
     }
 }
+    
